@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import socketManager from '../SocketManager';
 
 export class LoginScene extends Phaser.Scene {
     private username: string = '';
@@ -202,7 +203,10 @@ export class LoginScene extends Phaser.Scene {
     startGame() {
 
         this.errorText.setText('');
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        socketManager.connect(String(userData.userId), userData.token);
 
         this.scene.start('GameScene', { username: this.username });
     }
+
 }
