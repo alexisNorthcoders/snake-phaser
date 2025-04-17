@@ -27,10 +27,13 @@ class SocketManager {
     return "wss://snakemp.duckdns.org/ws"
   };
 
-
   send(data: any) {
+
     if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(data));
+      if (data === "p") this.socket.send("p")
+      else {
+        this.socket.send(JSON.stringify(data));
+      }
     } else {
       console.warn('[WebSocket] Not connected');
     }

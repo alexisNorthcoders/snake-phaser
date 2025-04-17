@@ -206,7 +206,7 @@ export class LoginScene extends Phaser.Scene {
         const userData = JSON.parse(localStorage.getItem('userData') || '{}');
         socketManager.connect(String(userData.userId), userData.token);
 
-        this.scene.start('GameScene', { username: this.username });
+        this.scene.start('GameScene');
     }
 
 }
