@@ -15,7 +15,6 @@ interface GridPosition {
 export class Snake {
     private scene: Phaser.Scene
     private graphics: Phaser.GameObjects.Graphics
-    private scale: number
     private gridSize: number
 
     public type: string
@@ -46,8 +45,7 @@ export class Snake {
         this.gridX = x
         this.gridY = y
 
-        this.scale = 50
-        this.gridSize = 20
+        this.gridSize = 40
 
         this.colors = {
             body: colors.body || getRandomColor(),
@@ -67,18 +65,18 @@ export class Snake {
         this.gridY = pos.y
     }
 
-    draw(): void {
-        const { graphics, scale, gridSize, tail, colors, transparent } = this
+    draw(yOffset: number): void {
+        const { graphics, gridSize, tail, colors, transparent } = this
 
         const headX = this.gridX * gridSize
-        const headY = this.gridY * gridSize
+        const headY = yOffset+ this.gridY * gridSize
 
         graphics.clear()
 
         // Draw tail
         tail.forEach((segment) => {
             const x = segment.x * gridSize
-            const y = segment.y * gridSize
+            const y = yOffset + segment.y * gridSize
 
             const bodyColor = Phaser.Display.Color.HexStringToColor(colors.body).color
             graphics.fillStyle(bodyColor, transparent)

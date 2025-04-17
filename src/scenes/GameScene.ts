@@ -10,6 +10,9 @@ interface SnakeColors {
 
 export class GameScene extends Phaser.Scene {
   private startTime: number = 0;
+  private scoreText!: Phaser.GameObjects.Text;
+  private pingText!: Phaser.GameObjects.Text;
+  private playerNameText!: Phaser.GameObjects.Text;
   private isGameOver: boolean = false;
   private gameStarted: boolean = false;
   private playerId: string = '';
@@ -34,6 +37,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+
+    this.add.rectangle(0, 0, 800, 40, 0x000000, 0.6).setOrigin(0);
+
+    this.scoreText = this.add.text(10, 10, 'Score: 0', {
+      fontSize: '20px',
+      color: '#ffffff',
+    }).setScrollFactor(0);
+
+    this.pingText = this.add.text(200, 10, 'Ping: --ms', {
+      fontSize: '20px',
+      color: '#ffffff',
+    }).setScrollFactor(0);
+
+    this.playerNameText = this.add.text(400, 10, `Player: ${this.name}`, {
+      fontSize: '20px',
+      color: '#ffffff',
+    }).setScrollFactor(0);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (!this.gameStarted || this.isGameOver) return;
@@ -103,7 +123,7 @@ export class GameScene extends Phaser.Scene {
 
     if (data === 'p') {
       const latency = Date.now() - this.startTime;
-      console.log(`Ping: ${latency}ms`);
+      this.pingText.setText(`Ping: ${latency}ms`);
       setTimeout(() => this.measurePing(), 5000);
       return;
     }
@@ -129,6 +149,7 @@ export class GameScene extends Phaser.Scene {
               colours: this.snakeColors
             }
           });
+          this.playerNameText.setText(`Player: ${this.name}`);
 
           this.measurePing();
         }
@@ -168,7 +189,7 @@ export class GameScene extends Phaser.Scene {
           if (!currentSnake) continue;
 
           if (snakeUpdate.playerId === this.playerId) {
-            // update score here
+            this.scoreText.setText(`Score: ${snakeUpdate.score}`);
           }
 
           if (currentSnake.isDead) continue;
@@ -201,7 +222,7 @@ export class GameScene extends Phaser.Scene {
 
     for (const snake of this.snakes.values()) {
       if (!snake.isDead) {
-        snake.draw();
+        snake.draw(40);
       }
     }
   }
