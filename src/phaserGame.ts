@@ -5,6 +5,7 @@ import { GameScene } from './scenes/GameScene';
 export function launchGame() {
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
+    pixelArt: true,
     width: 800,
     height: 840,
     parent: 'game-container',

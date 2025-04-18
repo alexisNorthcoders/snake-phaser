@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import socketManager from '../SocketManager';
 import { Snake } from '../Snake';
+import { Food } from '../Food';
+import { updateFood } from '../utils';
 
 interface SnakeColors {
   head: string;
@@ -16,8 +18,10 @@ export class GameScene extends Phaser.Scene {
   private isGameOver: boolean = false;
   private gameStarted: boolean = false;
   private playerId: string = '';
+  private gameConfigured: boolean = false
   private welcomeText?: Phaser.GameObjects.Text;
   private snakes: Map<string, Snake> = new Map();
+  private food: Array<Food> = []
   private snakeColors: SnakeColors = {
     head: '#00FF00',
     body: '#008000',
@@ -34,6 +38,16 @@ export class GameScene extends Phaser.Scene {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(`m:${this.playerId}:${direction}`);
     }
+  }
+
+  preload() {
+    this.load.image('redApple', 'assets/images/food/tile000.png');
+    this.load.image('greenApple', 'assets/images/food/tile001.png');
+    this.load.image('yellowApple', 'assets/images/food/tile002.png');
+    this.load.image('strawberry', 'assets/images/food/tile027.png');
+    this.load.image('cherry', 'assets/images/food/tile204.png');
+    this.load.image('chili', 'assets/images/food/tile068.png');
+    this.load.image('banana', 'assets/images/food/tile045.png');
   }
 
   create() {
@@ -154,6 +168,19 @@ export class GameScene extends Phaser.Scene {
           this.measurePing();
         }
         break;
+      case "config": {
+        if (!this.gameConfigured) {
+          this.gameConfigured = true
+          console.log(parsed)
+          const food = parsed.food
+          food.forEach((food: any) => {
+            const newFood = new Food(this, { x: food[0], y: food[1] }, food[2], food[3])
+            this.food.push(newFood)
+          })
+
+        }
+        break
+      }
       case 'waitingRoomStatus': {
         const players = parsed.players;
 
@@ -180,7 +207,6 @@ export class GameScene extends Phaser.Scene {
 
         break;
       }
-
       case 'snake_update_v2': {
         const snakes = parsed.snakes;
 
@@ -204,7 +230,11 @@ export class GameScene extends Phaser.Scene {
         }
         break;
       }
-
+      case 'updateFood': {
+        const [x, y, id, type] = parsed.food[0]
+        updateFood(x, y, id, type, this.food)
+        break
+      }
       default:
         console.log('[GameScene] Unhandled event:', parsed.event);
     }
@@ -219,6 +249,8 @@ export class GameScene extends Phaser.Scene {
 
   update(): void {
     if (!this.gameStarted) return;
+
+    this.food.forEach((f) => f.draw())
 
     for (const snake of this.snakes.values()) {
       if (!snake.isDead) {

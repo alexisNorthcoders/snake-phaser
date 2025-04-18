@@ -7,7 +7,7 @@ interface SnakeColorSet {
     eyes?: string
 }
 
-interface GridPosition {
+export interface GridPosition {
     x: number
     y: number
 }
@@ -69,7 +69,7 @@ export class Snake {
         const { graphics, gridSize, tail, colors, transparent } = this
 
         const headX = this.gridX * gridSize
-        const headY = yOffset+ this.gridY * gridSize
+        const headY = yOffset + this.gridY * gridSize
 
         graphics.clear()
 
