@@ -54,6 +54,7 @@ export class Snake {
         }
 
         this.graphics = this.scene.add.graphics()
+        this.graphics.setDepth(10)
     }
 
     direction(x: number, y: number): void {
