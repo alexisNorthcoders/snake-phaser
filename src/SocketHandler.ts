@@ -1,15 +1,15 @@
 import { GameScene } from './scenes/GameScene';
 import { Snake } from './Snake';
 import { Food } from './Food';
-import { updateFood } from './utils';
+import { drawBackground, updateFood } from './utils';
 import socketManager from './SocketManager';
 
 export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
   const data = msg.data;
 
   if (data === 'p') {
-    const latency = Date.now() - scene['startTime'];
-    scene['pingText'].setText(`Ping: ${latency}ms`);
+    const latency = Date.now() - scene.startTime;
+    scene.pingText.setText(`Ping: ${latency}ms`);
     setTimeout(() => measurePing(scene), 5000);
     return;
   }
@@ -25,26 +25,28 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
   switch (parsed.event) {
     case 'verified':
       console.log('Verified connection. Server is ready.');
-      if (!scene['gameStarted'] && !scene['isGameOver']) {
+      if (!scene.gameConfigured && !scene.isGameOver) {
         socketManager.send({
           event: 'newPlayer',
           player: {
-            name: scene['name'],
-            id: scene['playerId'],
-            colours: scene['snakeColors'],
+            name: scene.name,
+            id: scene.playerId,
+            colours: scene.snakeColors,
           }
         });
-        scene['playerNameText'].setText(`Player: ${scene['name']}`);
+        scene.playerNameText.setText(`Player: ${scene.name}`);
         measurePing(scene);
       }
       break;
 
     case 'config':
-      if (!scene['gameConfigured']) {
-        scene['gameConfigured'] = true;
+      console.log(parsed)
+      if (!scene.gameConfigured) {
+        scene.gameConfigured = true;
+        drawBackground(scene, parsed.config.backgroundNumber)
         parsed.food.forEach((food: any) => {
           const newFood = new Food(scene, { x: food[0], y: food[1] }, food[2], food[3]);
-          scene['food'].push(newFood);
+          scene.food.push(newFood);
         });
       }
       break;
@@ -57,17 +59,17 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
         newSnake.speed = snakeData.speed;
         newSnake.isDead = snakeData.isDead;
         newSnake.food = snakeData.score ?? 0;
-        scene['snakes'].set(player.id, newSnake);
+        scene.snakes.set(player.id, newSnake);
       });
       break;
 
     case 'snake_update_v2':
       for (const snakeUpdate of parsed.snakes) {
-        const currentSnake = scene['snakes'].get(snakeUpdate.playerId);
+        const currentSnake = scene.snakes.get(snakeUpdate.playerId);
         if (!currentSnake) continue;
 
-        if (snakeUpdate.playerId === scene['playerId']) {
-          scene['scoreText'].setText(`Score: ${snakeUpdate.score}`);
+        if (snakeUpdate.playerId === scene.playerId) {
+          scene.scoreText.setText(`Score: ${snakeUpdate.score}`);
         }
 
         if (currentSnake.isDead) continue;
@@ -84,7 +86,7 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
 
     case 'updateFood': {
       const [x, y, id, type] = parsed.food[0];
-      updateFood(x, y, id, type, scene['food']);
+      updateFood(x, y, id, type, scene.food);
       break;
     }
 
@@ -95,8 +97,8 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
 
 
 function measurePing(scene: GameScene) {
-  if (scene['isGameOver']) return;
+  if (scene.isGameOver) return;
 
-  scene['startTime'] = Date.now();
+  scene.startTime = Date.now();
   socketManager.send('p');
 }

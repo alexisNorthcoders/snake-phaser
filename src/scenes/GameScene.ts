@@ -3,6 +3,7 @@ import socketManager from '../SocketManager';
 import { Snake } from '../Snake';
 import { Food } from '../Food';
 import { handleSocketMessage } from '../SocketHandler';
+import { drawBackground } from '../utils';
 
 interface SnakeColors {
   head: string;
@@ -11,23 +12,25 @@ interface SnakeColors {
 }
 
 export class GameScene extends Phaser.Scene {
-  private startTime: number = 0;
-  private scoreText!: Phaser.GameObjects.Text;
-  private pingText!: Phaser.GameObjects.Text;
-  private playerNameText!: Phaser.GameObjects.Text;
-  private isGameOver: boolean = false;
-  private gameStarted: boolean = false;
-  private playerId: string = '';
-  private gameConfigured: boolean = false
-  private welcomeText?: Phaser.GameObjects.Text;
-  private snakes: Map<string, Snake> = new Map();
-  private food: Array<Food> = []
-  private snakeColors: SnakeColors = {
+  public startTime: number = 0;
+  public scoreText!: Phaser.GameObjects.Text;
+  public pingText!: Phaser.GameObjects.Text;
+  public playerNameText!: Phaser.GameObjects.Text;
+  public isGameOver: boolean = false;
+  public gameStarted: boolean = false;
+  public playerId: string = '';
+  public gameConfigured: boolean = false
+  public welcomeText?: Phaser.GameObjects.Text;
+  public snakes: Map<string, Snake> = new Map();
+  public food: Array<Food> = [];
+  public bg!: Phaser.GameObjects.TileSprite;
+
+  public snakeColors: SnakeColors = {
     head: '#00FF00',
     body: '#008000',
     eyes: '#FFFFFF'
   };
-  private name: string = '';
+  public name: string = '';
 
   constructor() {
     super('GameScene');
@@ -48,9 +51,20 @@ export class GameScene extends Phaser.Scene {
     this.load.image('cherry', 'assets/images/food/tile204.png');
     this.load.image('chili', 'assets/images/food/tile068.png');
     this.load.image('banana', 'assets/images/food/tile045.png');
+    for (let i = 1; i <= 91; i++) {
+      this.load.image(`${i}`, `assets/images/backgrounds/color_background_${i}.png`);
+    }
   }
 
   create() {
+
+    this.bg = this.add.tileSprite(
+      0,
+      40,
+      this.scale.width,
+      this.scale.height - 40,
+      '1'
+    ).setOrigin(0, 0);
 
     this.add.rectangle(0, 0, 800, 40, 0x000000, 0.6).setOrigin(0);
 
