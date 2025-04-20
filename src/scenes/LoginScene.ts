@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import socketManager from '../SocketManager';
+import { getHighScores } from '../Snake';
 
 export class LoginScene extends Phaser.Scene {
     private username: string = '';
@@ -14,6 +14,7 @@ export class LoginScene extends Phaser.Scene {
     }
 
     create() {
+        getHighScores()
         // Display Title
         this.add.text(400, 50, 'Login to Play', {
             fontSize: '32px',
@@ -189,13 +190,9 @@ export class LoginScene extends Phaser.Scene {
         return '/api'
     }
 
-
     startGame() {
 
         this.errorText.setText('');
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        socketManager.connect(String(userData.userId), userData.token);
-
         this.scene.start('GameScene');
     }
 

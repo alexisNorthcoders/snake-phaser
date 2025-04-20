@@ -108,16 +108,62 @@ export class Snake {
         graphics.strokeRect(eyeX2, eyeY, eyeSize, eyeSize)
     }
 
-    async stop(playerId: string, score: number, isAnonymous: boolean, postUserScore: (id: string) => Promise<void>): Promise<void> {
+    async stop(playerId: string, score: number, isAnonymous: boolean): Promise<void> {
         this.isDead = true
         this.colors.head = 'black'
         this.colors.eyes = 'gray'
         this.colors.body = 'rgb(139, 0, 0)'
 
         if (this.type === 'player') {
-            const idToUse = isAnonymous ? 'anon' : playerId
-            await postUserScore(idToUse)
-            console.log(`Posted score of ${score} for PlayerId: ${idToUse}`)
+
+            await postUserScore(score)
         }
+    }
+}
+
+async function postUserScore(score: number): Promise<void> {
+
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+
+    try {
+        const response = await fetch("/api/add-score", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${userData.token}`,
+            },
+            body: JSON.stringify({ score }),
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Failed to post score: ${response.status} ${err}`);
+        }
+
+        const data = await response.json();
+        console.log("✅ Score posted:", data.message);
+    } catch (error) {
+        console.error("❌ Error posting score:", error);
+    }
+}
+
+export async function getHighScores(): Promise<void> {
+    try {
+        const response = await fetch("/api/high-scores", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Failed to get high scores: ${response.status} ${err}`);
+        }
+
+        const data = await response.json();
+        console.log("✅ High Scores: ", data);
+    } catch (error) {
+        console.error("❌ Error fetching high scores: ", error);
     }
 }

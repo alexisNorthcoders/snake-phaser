@@ -138,13 +138,9 @@ export class GameScene extends Phaser.Scene {
       color: '#fff',
     }).setOrigin(0.5);
 
-    const socket = socketManager.getSocket();
-    if (socket) {
-      socket.onmessage = (msg) => handleSocketMessage(this, msg);
+    // connect to websockets
+    socketManager.connect(String(userData.userId), userData.token, this);
 
-    } else {
-      console.warn('[GameScene] Socket not connected!');
-    }
   }
 
   update(): void {

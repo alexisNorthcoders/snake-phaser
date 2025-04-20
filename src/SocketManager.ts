@@ -1,7 +1,10 @@
+import { GameScene } from "./scenes/GameScene";
+import { handleSocketMessage } from "./SocketHandler";
+
 class SocketManager {
   private socket: WebSocket | null = null;
 
-  connect(playerId: string, token: string, onMessage?: (msg: MessageEvent) => void) {
+  connect(playerId: string, token: string, scene: GameScene) {
     const url = this.getWebSocketUrl();
     this.socket = new WebSocket(`${url}?player_id=${playerId}&access_token=${token}`);
 
@@ -14,8 +17,7 @@ class SocketManager {
     };
 
     this.socket.onmessage = (msg) => {
-      console.log('[WebSocket] Message:', msg.data);
-      onMessage?.(msg);
+      handleSocketMessage(scene, msg);
     };
   }
 

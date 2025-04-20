@@ -79,7 +79,7 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
         currentSnake.position({ x: snakeUpdate.x, y: snakeUpdate.y });
 
         if (snakeUpdate.isDead) {
-          currentSnake.stop(snakeUpdate.playerId, snakeUpdate.score, false, async () => { });
+          currentSnake.stop(snakeUpdate.playerId, snakeUpdate.score, false);
         }
       }
       break;
