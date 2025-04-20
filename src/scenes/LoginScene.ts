@@ -186,17 +186,7 @@ export class LoginScene extends Phaser.Scene {
 
     // Helper method to get the API URL
     getAPIUrl() {
-        if (window.location.hostname === 'raspberrypi.local') {
-            return 'http://raspberrypi.local:4123';
-        } else if (
-            window.location.hostname === 'alexisraspberry.duckdns.org' ||
-            window.location.hostname === '95.217.177.76' ||
-            window.location.hostname === 'snakemp.duckdns.org'
-        ) {
-            return 'https://clipboard.duckdns.org';
-        } else {
-            return 'https://clipboard.duckdns.org';
-        }
+        return '/api'
     }
 
 
