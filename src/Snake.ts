@@ -44,7 +44,7 @@ export class Snake {
         this.gridX = x
         this.gridY = y
 
-        this.gridSize = 40
+        this.gridSize = Math.floor(Math.min(scene.scale.width, scene.scale.height) / 20);
 
         this.colors = {
             body: colors.body || getRandomColor(),

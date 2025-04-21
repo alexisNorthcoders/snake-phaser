@@ -63,7 +63,7 @@ export class GameScene extends Phaser.Scene {
       '1'
     ).setOrigin(0, 0);
 
-    this.add.rectangle(0, 0, 800, 40, 0x000000, 0.6).setOrigin(0);
+    this.add.rectangle(0, 0, this.scale.width, 40, 0x000000, 0.6).setOrigin(0);
 
     this.scoreText = this.add.text(10, 10, 'Score: 0', {
       fontSize: '20px',

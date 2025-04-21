@@ -21,11 +21,9 @@ export class LoginScene extends Phaser.Scene {
 
         if (userData) {
             const parsedUserData = JSON.parse(userData);
-            console.log('Username found..verifying token...')
             this.verifyToken(parsedUserData.token)
                 .then((isValid) => {
                     if (isValid) {
-                        console.log('Token valid. Changing scene...')
                         this.startGame();
                     } else {
                         this.showLoginScreen();

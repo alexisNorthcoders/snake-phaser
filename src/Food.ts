@@ -8,16 +8,18 @@ export class Food {
     public id: number
     private scene: Phaser.Scene;
     private sprite?: Phaser.GameObjects.Image;
+    private cellSize: number;
 
     constructor(scene: Phaser.Scene, position: GridPosition, id: number, type: FoodType) {
         this.scene = scene;
-        this.position = { x: position.x * 40, y: 40 + position.y * 40 }
+        this.cellSize = Math.floor(Math.min(scene.scale.width, scene.scale.height) / 20);
+        this.position = { x: position.x * this.cellSize, y: 40 + position.y * this.cellSize }
         this.type = type
         this.id = id
     }
 
     updateFood(position: GridPosition, type: FoodType) {
-        this.position = { x: position.x * 40, y: 40 + position.y * 40 }
+        this.position = { x: position.x * this.cellSize, y: this.cellSize + position.y * this.cellSize }
         this.sprite?.setTexture(type)
     }
 
@@ -26,8 +28,8 @@ export class Food {
 
             this.sprite = this.scene.add.image(this.position.x, this.position.y, this.type);
             this.sprite.setOrigin(0, 0);
-            this.sprite.displayWidth = 40;
-            this.sprite.displayHeight = 40;
+            this.sprite.displayWidth = this.cellSize;
+            this.sprite.displayHeight = this.cellSize;
         } else {
 
             this.sprite.setPosition(this.position.x, this.position.y);
