@@ -1,4 +1,3 @@
-import { Scene } from "phaser";
 import { Food, FoodType } from "./Food";
 import { GameScene } from "./scenes/GameScene";
 

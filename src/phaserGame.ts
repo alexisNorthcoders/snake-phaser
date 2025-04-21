@@ -1,10 +1,10 @@
-import Phaser from 'phaser';
+import { Game, AUTO } from 'phaser';
 import { LoginScene } from './scenes/LoginScene';
 import { GameScene } from './scenes/GameScene';
 
 export function launchGame() {
   const config: Phaser.Types.Core.GameConfig = {
-    type: Phaser.AUTO,
+    type: AUTO,
     pixelArt: true,
     width: 800,
     height: 840,
@@ -13,5 +13,5 @@ export function launchGame() {
     scene: [LoginScene, GameScene],
   };
 
-  new Phaser.Game(config);
+  new Game(config);
 }

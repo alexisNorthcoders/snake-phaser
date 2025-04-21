@@ -1,9 +1,6 @@
-import Phaser from 'phaser';
 import socketManager from '../SocketManager';
 import { Snake } from '../Snake';
 import { Food } from '../Food';
-import { handleSocketMessage } from '../SocketHandler';
-import { drawBackground } from '../utils';
 
 interface SnakeColors {
   head: string;
@@ -83,6 +80,21 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setScrollFactor(0);
 
+    // Logout button
+    const logoutButton = this.add.text(700, 10, 'Logout', {
+      fontSize: '20px',
+      color: '#ff0000',
+      backgroundColor: '#222',
+      padding: { x: 10, y: 5 },
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerover', () => logoutButton.setStyle({ backgroundColor: '#444' }))
+      .on('pointerout', () => logoutButton.setStyle({ backgroundColor: '#222' }))
+      .on('pointerdown', () => {
+        this.logout();
+      });
+
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (!this.gameStarted || this.isGameOver) return;
 
@@ -141,6 +153,43 @@ export class GameScene extends Phaser.Scene {
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
 
+  }
+
+  async logout() {
+
+    socketManager.close();
+
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+
+    if (userData.token) {
+      try {
+
+        const response = await fetch(`/api/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userData.token}`,
+          },
+        });
+
+        if (response.ok) {
+
+          localStorage.removeItem('userData');
+          this.scene.start('LoginScene');
+        } else {
+
+          console.error('Failed to log out:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error during logout:', error);
+
+      }
+    } else {
+
+      localStorage.removeItem('userData');
+      this.scene.stop('GameScene');
+      this.scene.start('LoginScene');
+    }
   }
 
   update(): void {
