@@ -1,8 +1,9 @@
+import InputText from "phaser3-rex-plugins/plugins/inputtext";
 import { getHighScores } from "../Snake";
 
 export class LoginScene extends Phaser.Scene {
-    private usernameInput!: HTMLInputElement;
-    private passwordInput!: HTMLInputElement;
+    private passwordText!: InputText
+    private usernameText!: InputText
     private errorText!: Phaser.GameObjects.Text;
     private submitButton!: Phaser.GameObjects.Text;
     private toggleModeButton!: Phaser.GameObjects.Text;
@@ -20,15 +21,13 @@ export class LoginScene extends Phaser.Scene {
 
         if (userData) {
             const parsedUserData = JSON.parse(userData);
-
+            console.log('Username found..verifying token...')
             this.verifyToken(parsedUserData.token)
                 .then((isValid) => {
                     if (isValid) {
-
+                        console.log('Token valid. Changing scene...')
                         this.startGame();
                     } else {
-
-                        localStorage.removeItem('userData');
                         this.showLoginScreen();
                     }
                 })
@@ -54,39 +53,19 @@ export class LoginScene extends Phaser.Scene {
         this.add.text(100, 150, 'Username:', { fontSize: '24px', color: '#fff' });
         this.add.text(100, 300, 'Password:', { fontSize: '24px', color: '#fff' });
 
-        // Create login UI elements (inputs, buttons, etc.)
-        this.usernameInput = document.createElement('input');
-        this.usernameInput.type = 'text';
-        this.usernameInput.style.position = 'absolute';
-        this.usernameInput.style.left = '500px';
-        this.usernameInput.style.top = '174px';
-        this.usernameInput.style.fontSize = '24px';
-        this.usernameInput.style.padding = '5px';
-        this.usernameInput.style.backgroundColor = '#333';
-        this.usernameInput.style.color = 'white';
-        this.usernameInput.style.border = 'none';
-        this.usernameInput.style.outline = 'none';
-        document.body.appendChild(this.usernameInput);
+        this.passwordText = new InputText(this, 310, 310, 150, 40, { backgroundColor: '#333', fontSize: '24px', color: '#fff', type: 'password' })
+        this.add.existing(this.passwordText);
 
-        // HTML Input for Password
-        this.passwordInput = document.createElement('input');
-        this.passwordInput.type = 'password';
-        this.passwordInput.style.position = 'absolute';
-        this.passwordInput.style.left = '500px';
-        this.passwordInput.style.top = '324px';
-        this.passwordInput.style.fontSize = '24px';
-        this.passwordInput.style.padding = '5px';
-        this.passwordInput.style.backgroundColor = '#333';
-        this.passwordInput.style.color = 'white';
-        this.passwordInput.style.border = 'none';
-        this.passwordInput.style.outline = 'none';
-        document.body.appendChild(this.passwordInput);
+        this.usernameText = new InputText(this, 310, 160, 150, 40, { backgroundColor: '#333', fontSize: '24px', color: '#fff', type: 'text' })
+        this.add.existing(this.usernameText);
+
+        this.usernameText.setFocus()
 
         // Load the last used username from userData (if exists)
         const userData = localStorage.getItem('userData');
         if (userData) {
             const parsedUserData = JSON.parse(userData);
-            this.usernameInput.value = parsedUserData.username;
+            this.usernameText.text = parsedUserData.username;
         }
 
         // Error Text (Initially Hidden)
@@ -123,26 +102,9 @@ export class LoginScene extends Phaser.Scene {
             .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => this.anonymous());
 
-        // Focus on the username input when the scene starts
-        this.usernameInput.focus();
-
-        // Close keyboard when user clicks outside input
-        window.addEventListener('click', (e) => {
-            if (e.target !== this.usernameInput && e.target !== this.passwordInput) {
-                this.usernameInput.blur();
-                this.passwordInput.blur();
-            }
-        });
     }
 
     showLoginScreen() {
-        // Remove the input elements if they're still in the DOM
-        if (this.usernameInput && this.passwordInput) {
-            document.body.removeChild(this.usernameInput);
-            document.body.removeChild(this.passwordInput);
-        }
-
-        // Recreate the inputs and render the login screen (as before)
         this.createLoginUI();
     }
 
@@ -156,8 +118,8 @@ export class LoginScene extends Phaser.Scene {
     }
 
     async submit() {
-        const username = this.usernameInput.value;
-        const password = this.passwordInput.value;
+        const username = this.usernameText.text;
+        const password = this.passwordText.text;
 
         if (!username || !password) {
             this.errorText.setText('Both fields are required.');
@@ -268,10 +230,6 @@ export class LoginScene extends Phaser.Scene {
     }
 
     startGame() {
-        if (this.usernameInput && this.passwordInput) {
-            document.body.removeChild(this.usernameInput);
-            document.body.removeChild(this.passwordInput);
-        }
         this.scene.start('GameScene');
     }
 }
