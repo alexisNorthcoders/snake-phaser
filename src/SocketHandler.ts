@@ -5,20 +5,11 @@ import { drawBackground, updateFood } from './utils';
 import socketManager from './SocketManager';
 
 export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
-  const data = msg.data;
-
-  if (data === 'p') {
-    const latency = Date.now() - scene.startTime;
-    scene.pingText.setText(`Ping: ${latency}ms`);
-    setTimeout(() => measurePing(scene), 5000);
-    return;
-  }
-
   let parsed;
   try {
-    parsed = JSON.parse(data);
+    parsed = JSON.parse(msg.data);
   } catch (e) {
-    console.warn('[GameScene] Non-JSON message received:', data);
+    console.warn('[GameScene] Non-JSON message received:', msg.data);
     return;
   }
 
@@ -35,7 +26,6 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
           }
         });
         scene.playerNameText.setText(`Player: ${scene.name}`);
-        measurePing(scene);
       }
       break;
 
@@ -63,27 +53,6 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
       });
       break;
 
-    case 'snake_update_v2':
-      for (const snakeUpdate of parsed.snakes) {
-        const currentSnake = scene.snakes.get(snakeUpdate.playerId);
-        if (!currentSnake) continue;
-
-        if (snakeUpdate.playerId === scene.playerId) {
-          scene.scoreText.setText(`Score: ${snakeUpdate.score}`);
-        }
-
-        if (currentSnake.isDead) continue;
-
-        currentSnake.tail = snakeUpdate.tail;
-        currentSnake.food = snakeUpdate.score;
-        currentSnake.position({ x: snakeUpdate.x, y: snakeUpdate.y });
-
-        if (snakeUpdate.isDead) {
-          currentSnake.stop(snakeUpdate.playerId, snakeUpdate.score, false);
-        }
-      }
-      break;
-
     case 'updateFood': {
       const [x, y, id, type] = parsed.food[0];
       updateFood(x, y, id, type, scene.food);
@@ -94,11 +63,3 @@ export function handleSocketMessage(scene: GameScene, msg: MessageEvent) {
       console.log('[GameScene] Unhandled event:', parsed.event);
   }
 };
-
-
-function measurePing(scene: GameScene) {
-  if (scene.isGameOver) return;
-
-  scene.startTime = Date.now();
-  socketManager.send('p');
-}

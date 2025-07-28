@@ -28,16 +28,17 @@ export class GameScene extends Phaser.Scene {
     eyes: '#FFFFFF'
   };
   public name: string = '';
+  private startButton?: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
   }
 
   private sendPlayerMovement(direction: 'u' | 'd' | 'l' | 'r'): void {
-    const socket = socketManager.getSocket();
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(`m:${this.playerId}:${direction}`);
-    }
+    socketManager.send({
+      event: 'move',
+      key: direction
+    });
   }
 
   preload() {
@@ -96,6 +97,7 @@ export class GameScene extends Phaser.Scene {
       });
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+
       if (!this.gameStarted || this.isGameOver) return;
 
       const key = event.key.toLowerCase();
@@ -118,6 +120,7 @@ export class GameScene extends Phaser.Scene {
         case 'd':
           direction = 'r';
           break;
+
       }
 
       if (direction) {
@@ -125,19 +128,16 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    const startButton = this.add.text(400, 400, 'START GAME', {
+    this.startButton = this.add.text(400, 400, 'START GAME', {
       fontSize: '28px',
       backgroundColor: '#00AA00',
       color: '#FFFFFF',
       padding: { x: 10, y: 5 },
     }).setOrigin(0.5).setInteractive();
 
-    startButton.on('pointerdown', () => {
+    this.startButton.on('pointerdown', () => {
+      console.log("[GameScene] Start button clicked");
       socketManager.send({ event: 'startGame' });
-      startButton.setVisible(false);
-      this.gameStarted = true;
-
-      this.welcomeText?.destroy();
     });
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -153,6 +153,8 @@ export class GameScene extends Phaser.Scene {
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
 
+    // Start ping measurement after connection
+    socketManager.startPingMeasurement(this);
   }
 
   async logout() {
@@ -192,8 +194,34 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  startGame() {
+    console.log("[GameScene] Requesting game start");
+    socketManager.send({ event: 'startGame' });
+  }
+
+  onGameStarted() {
+    console.log("[GameScene] Game started callback");
+    this.gameStarted = true;
+
+    // Remove start button
+    if (this.startButton) {
+      this.startButton.destroy();
+      this.startButton = undefined;
+    }
+
+    // Remove welcome text if it exists
+    if (this.welcomeText) {
+      this.welcomeText.destroy();
+    }
+
+    // Initialize game state
+    this.isGameOver = false;
+  }
+
   update(): void {
-    if (!this.gameStarted) return;
+    if (!this.gameStarted) {
+      return;
+    }
 
     this.food.forEach((f) => f.draw())
 
@@ -202,5 +230,32 @@ export class GameScene extends Phaser.Scene {
         snake.draw(40);
       }
     }
+  }
+
+  init() {
+    // Initialize properties here
+    this.snakes = new Map();
+    this.food = [];
+    this.gameStarted = false;
+    this.isGameOver = false;
+    this.gameConfigured = false;
+  }
+
+  shutdown() {
+    // Clean up our custom resources
+    socketManager.stopPingMeasurement();
+
+    // Clear game objects
+    this.snakes.clear();
+    this.food = [];
+
+    // Remove keyboard listeners
+    this.input.keyboard?.removeAllListeners();
+
+    // Remove any remaining text objects
+    this.scoreText?.destroy();
+    this.pingText?.destroy();
+    this.playerNameText?.destroy();
+    this.welcomeText?.destroy();
   }
 }

@@ -8,15 +8,16 @@ export function launchGame() {
   const MAX_HEIGHT = 840;
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
+console.log(isMobile)
   const width = isMobile ? Math.min(window.innerWidth, MAX_WIDTH) : MAX_WIDTH;
   const height = isMobile ? Math.min(window.innerHeight, MAX_HEIGHT) : MAX_HEIGHT;
+  console.log(width)
 
   const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
     pixelArt: true,
     width,
-    height,
+    height: width,
     parent: 'game-container',
     dom: {
       createContainer: true
@@ -31,10 +32,10 @@ export function launchGame() {
       }]
     },
     scale: {
-      mode: isMobile ? Phaser.Scale.FIT : Phaser.Scale.NONE,
+     // mode: isMobile ? Phaser.Scale.FIT : Phaser.Scale.NONE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: MAX_WIDTH,
-      height: MAX_HEIGHT
+      width: width,
+      height: width
     }
   };
 
