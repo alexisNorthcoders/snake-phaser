@@ -1,5 +1,7 @@
 import { Client, Room } from "colyseus.js";
 import { Snake } from "./Snake";
+import { GameScene } from "./scenes/GameScene";
+import { Food } from "./Food";
 
 class SocketManager {
   private client: Client | null = null;
@@ -18,7 +20,7 @@ class SocketManager {
     PONG: "pong"
   };
 
-  async connect(playerId: string, token: string, scene: any) {
+  async connect(playerId: string, token: string, scene: GameScene) {
     try {
       this.client = new Client("ws://localhost:4002");
       this.room = await this.client.joinOrCreate("snake", {
@@ -34,6 +36,7 @@ class SocketManager {
       this.room.onMessage(SocketManager.messageTypes.GAME_STARTED, () => {
         console.log("[SocketManager] Received gameStarted event");
         scene.gameStarted = true;
+
         // Trigger any additional game start logic in the scene
         if (typeof scene.onGameStarted === 'function') {
           scene.onGameStarted();
@@ -45,6 +48,10 @@ class SocketManager {
         if (state.hasGameStarted && !scene.gameStarted) {
           console.log("[SocketManager] Game started from state change");
           scene.gameStarted = true;
+          state.foodCoordinates.forEach(food => {
+            const newFood = new Food(scene, { x: food.x, y: food.y }, food.index, food.type)
+            scene.food.push(newFood)
+          })
           if (typeof scene.onGameStarted === 'function') {
             scene.onGameStarted();
           }
@@ -58,42 +65,41 @@ class SocketManager {
 
       // Handle state changes for snake positions
       this.room.onStateChange((state) => {
-        
+
         state.players.forEach((player) => {
-            if (player.snake) {
-                const currentSnake = scene.snakes.get(player.id);
-                if (currentSnake) {
-                    // Update existing snake
-                    if (player.id === playerId) {
-                        scene.scoreText.setText(`Score: ${player.snake.score}`);
-                    }
+          if (player.snake) {
+            const currentSnake = scene.snakes.get(player.id);
+            if (currentSnake) {
+              // Update existing snake
+              if (player.id === playerId) {
+                scene.scoreText.setText(`Score: ${player.snake.score}`);
+              }
 
-                    if (!currentSnake.isDead) {
-                        currentSnake.tail = player.snake.tail;
-                        currentSnake.food = player.snake.score;
-                        currentSnake.position({ x: player.snake.x, y: player.snake.y });
+              if (!currentSnake.isDead) {
+                currentSnake.tail = player.snake.tail;
+                currentSnake.food = player.snake.score;
+                currentSnake.position({ x: player.snake.x, y: player.snake.y });
 
-                        if (player.snake.isDead) {
-                            currentSnake.stop(player.id, player.snake.score, false);
-                        }
-                    }
-                } else {
-                    // Create new snake if it doesn't exist
-                    const newSnake = new Snake(
-                        scene,
-                        player.snake.x,
-                        player.snake.y,
-                        player.type,
-                        player.colours,
-                        player.snake.size
-                    );
-                    scene.snakes.set(player.id, newSnake);
+                if (player.snake.isDead) {
+                  currentSnake.stop(player.id, player.snake.score, false);
                 }
-            }
-        });
-      });
+              }
+            } else {
 
-      // Start ping measurement after setting up handlers
+              const newSnake = new Snake(
+                scene,
+                player.snake.x,
+                player.snake.y,
+                player.type,
+                player.colours,
+                player.snake.size
+              );
+              scene.snakes.set(player.id, newSnake);
+            }
+          }
+        });
+      })
+
       this.startPingMeasurement(scene);
 
     } catch (error) {
@@ -103,8 +109,6 @@ class SocketManager {
 
   send(data: any) {
     if (this.room?.connection.isOpen) {
-      console.log("[SocketManager] Sending message:", data.event, data);
-      // Send the event directly without trying to convert it
       this.room.send(data.event, data);
     } else {
       console.warn("[SocketManager] Cannot send message - room not connected");
