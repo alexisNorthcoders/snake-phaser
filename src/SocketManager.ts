@@ -2,10 +2,11 @@ import { Client, Room } from "colyseus.js";
 import { Snake } from "./Snake";
 import { GameScene } from "./scenes/GameScene";
 import { Food } from "./Food";
+import { GameState } from "./schemas/Food";
 
 class SocketManager {
   private client: Client | null = null;
-  private room: Room | null = null;
+  private room: Room<GameState> | null = null;
   private pingInterval: number | null = null;
   private lastPingTime: number = 0;
 
@@ -22,8 +23,10 @@ class SocketManager {
 
   async connect(playerId: string, token: string, scene: GameScene) {
     try {
-      this.client = new Client("ws://localhost:4002");
-      this.room = await this.client.joinOrCreate("snake", {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      this.client = new Client(`${protocol}//${host}/colyseus`);
+      this.room = await this.client.joinOrCreate<GameState>("snake", {
         playerId,
         token,
         name: scene.name,
@@ -40,21 +43,6 @@ class SocketManager {
         // Trigger any additional game start logic in the scene
         if (typeof scene.onGameStarted === 'function') {
           scene.onGameStarted();
-        }
-      });
-
-      // Add state change handler specifically for game start
-      this.room.onStateChange((state) => {
-        if (state.hasGameStarted && !scene.gameStarted) {
-          console.log("[SocketManager] Game started from state change");
-          scene.gameStarted = true;
-          state.foodCoordinates.forEach(food => {
-            const newFood = new Food(scene, { x: food.x, y: food.y }, food.index, food.type)
-            scene.food.push(newFood)
-          })
-          if (typeof scene.onGameStarted === 'function') {
-            scene.onGameStarted();
-          }
         }
       });
 
@@ -99,6 +87,35 @@ class SocketManager {
           }
         });
       })
+
+      this.room.onStateChange((state) => {
+        if (state.hasGameStarted) {
+          if (!scene.gameStarted) {
+            // Game just started: initialize food list
+            scene.gameStarted = true;
+            scene.food.length = 0;
+            state.foodCoordinates.forEach(food => {
+              const newFood = new Food(scene, { x: food.x, y: food.y }, food.index, food.type);
+              scene.food.push(newFood);
+            });
+            if (typeof scene.onGameStarted === 'function') {
+              scene.onGameStarted();
+            }
+          }
+          else {
+            state.foodCoordinates.forEach(food => {
+              const localFood = scene.food.find(f => f.id === food.index);
+              if (localFood &&
+                (localFood.type !== food.type ||
+                  localFood.position.x !== food.x * localFood['cellSize'] ||
+                  localFood.position.y !== 40 + food.y * localFood['cellSize'])) {
+                console.log('updating food', food);
+                localFood.updateFood({ x: food.x, y: food.y }, food.type);
+              }
+            });
+          }
+        }
+      });
 
       this.startPingMeasurement(scene);
 

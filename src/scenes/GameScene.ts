@@ -222,7 +222,6 @@ export class GameScene extends Phaser.Scene {
     if (!this.gameStarted) {
       return;
     }
-
     this.food.forEach((f) => f.draw())
 
     for (const snake of this.snakes.values()) {
