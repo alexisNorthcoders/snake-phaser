@@ -31,7 +31,7 @@ Features from the old p5.js project (`p5_snake_game`) that were not fully carrie
 
 ## 3. High scores fetched but never displayed
 
-- [ ] Render fetched high scores in the UI (e.g. login/waiting screen or game-over screen).
+- [x] Render fetched high scores in the UI (e.g. login/waiting screen or game-over screen).
 
 **Current state:** `getHighScores()` in `src/Snake.ts:149` fetches high scores but only `console.log`s the result — nothing renders it.
 

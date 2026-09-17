@@ -1,5 +1,5 @@
 import socketManager from '../SocketManager';
-import { Snake } from '../Snake';
+import { Snake, getHighScores, HighScore } from '../Snake';
 import { Food } from '../Food';
 
 interface SnakeColors {
@@ -234,30 +234,78 @@ export class GameScene extends Phaser.Scene {
     this.isGameOver = false;
   }
 
-  onGameOver(payload: GameOverPayload) {
+  async onGameOver(payload: GameOverPayload) {
     console.log("[GameScene] Game over callback", payload);
     this.isGameOver = true;
     this.clearGameOverOverlay();
 
-    const panel = this.add.rectangle(400, 300, 360, 320, 0x000000, 0.8).setOrigin(0.5).setDepth(20);
+    const topScores: HighScore[] = (await getHighScores()).slice(0, 3);
 
-    const title = this.add.text(400, 170, 'GAME OVER', {
+    const PANEL_CENTER_X = 400;
+    const TITLE_Y = 170;
+    const RANKINGS_START_Y = 220;
+    const ROW_HEIGHT = 28;
+    const SECTION_GAP = 20;
+    const BUTTON_GAP = 30;
+    const PANEL_TOP_PADDING = 30;
+    const PANEL_BOTTOM_PADDING = 40;
+    const PANEL_WIDTH = 360;
+
+    const rankings = payload?.rankings ?? [];
+    const rankingsEndY = rankings.length > 0
+      ? RANKINGS_START_Y + (rankings.length - 1) * ROW_HEIGHT
+      : RANKINGS_START_Y - ROW_HEIGHT;
+
+    const topScoresHeaderY = rankingsEndY + ROW_HEIGHT + SECTION_GAP;
+    const topScoresStartY = topScoresHeaderY + ROW_HEIGHT;
+    const rowCount = Math.max(topScores.length, 1);
+    const topScoresEndY = topScoresStartY + (rowCount - 1) * ROW_HEIGHT;
+    const playAgainY = topScoresEndY + ROW_HEIGHT + BUTTON_GAP;
+
+    const panelTopY = TITLE_Y - PANEL_TOP_PADDING;
+    const panelBottomY = playAgainY + PANEL_BOTTOM_PADDING;
+    const panelCenterY = (panelTopY + panelBottomY) / 2;
+
+    const panel = this.add.rectangle(PANEL_CENTER_X, panelCenterY, PANEL_WIDTH, panelBottomY - panelTopY, 0x000000, 0.8).setOrigin(0.5).setDepth(20);
+
+    const title = this.add.text(PANEL_CENTER_X, TITLE_Y, 'GAME OVER', {
       fontSize: '32px',
       color: '#ff4444',
     }).setOrigin(0.5).setDepth(20);
 
     this.gameOverObjects.push(panel, title);
 
-    const rankings = payload?.rankings ?? [];
     rankings.forEach((entry, index) => {
-      const line = this.add.text(400, 220 + index * 28, `#${index + 1}: ${entry.name} - ${entry.score}`, {
+      const line = this.add.text(PANEL_CENTER_X, RANKINGS_START_Y + index * ROW_HEIGHT, `#${index + 1}: ${entry.name} - ${entry.score}`, {
         fontSize: '20px',
         color: '#ffffff',
       }).setOrigin(0.5).setDepth(20);
       this.gameOverObjects.push(line);
     });
 
-    const playAgainButton = this.add.text(400, 420, 'PLAY AGAIN', {
+    const topScoresHeader = this.add.text(PANEL_CENTER_X, topScoresHeaderY, 'TOP SCORES', {
+      fontSize: '22px',
+      color: '#ff4444',
+    }).setOrigin(0.5).setDepth(20);
+    this.gameOverObjects.push(topScoresHeader);
+
+    if (topScores.length > 0) {
+      topScores.forEach((hs, index) => {
+        const line = this.add.text(PANEL_CENTER_X, topScoresStartY + index * ROW_HEIGHT, `#${index + 1}: ${hs.username} - ${hs.score}`, {
+          fontSize: '20px',
+          color: '#ffffff',
+        }).setOrigin(0.5).setDepth(20);
+        this.gameOverObjects.push(line);
+      });
+    } else {
+      const emptyLine = this.add.text(PANEL_CENTER_X, topScoresStartY, 'No high scores yet', {
+        fontSize: '18px',
+        color: '#aaaaaa',
+      }).setOrigin(0.5).setDepth(20);
+      this.gameOverObjects.push(emptyLine);
+    }
+
+    const playAgainButton = this.add.text(PANEL_CENTER_X, playAgainY, 'PLAY AGAIN', {
       fontSize: '24px',
       backgroundColor: '#00AA00',
       color: '#FFFFFF',

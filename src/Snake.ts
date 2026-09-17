@@ -150,7 +150,13 @@ async function postUserScore(score: number): Promise<void> {
     }
 }
 
-export async function getHighScores(): Promise<void> {
+export interface HighScore {
+    username: string;
+    score: number;
+    timestamp: string;
+}
+
+export async function getHighScores(): Promise<HighScore[]> {
     try {
         const response = await fetch("/api/high-scores", {
             method: "GET",
@@ -164,9 +170,11 @@ export async function getHighScores(): Promise<void> {
             throw new Error(`Failed to get high scores: ${response.status} ${err}`);
         }
 
-        const data = await response.json();
+        const data: HighScore[] | null = await response.json();
         console.log("✅ High Scores: ", data);
+        return data ?? [];
     } catch (error) {
         console.error("❌ Error fetching high scores: ", error);
+        return [];
     }
 }

@@ -1,5 +1,4 @@
 import InputText from "phaser3-rex-plugins/plugins/inputtext";
-import { getHighScores } from "../Snake";
 
 export class LoginScene extends Phaser.Scene {
     private passwordText!: InputText
@@ -14,8 +13,6 @@ export class LoginScene extends Phaser.Scene {
     }
 
     create() {
-
-        getHighScores()
 
         const userData = localStorage.getItem('userData');
 
