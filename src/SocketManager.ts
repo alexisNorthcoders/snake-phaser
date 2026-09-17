@@ -89,7 +89,6 @@ class SocketManager {
                 (localFood.type !== food.type ||
                   localFood.position.x !== food.x * localFood['cellSize'] ||
                   localFood.position.y !== 40 + food.y * localFood['cellSize'])) {
-                console.log('updating food', food);
                 localFood.updateFood({ x: food.x, y: food.y }, food.type);
               }
             });
@@ -99,7 +98,8 @@ class SocketManager {
         // Drop snakes for players no longer present in the room state
         // (e.g. disconnected mid-round) so their last frame doesn't freeze
         // on screen forever.
-        const activePlayerIds = new Set(Array.from(state.players.keys()));
+        const activePlayerIds = new Set<string>();
+        state.players.forEach((player) => activePlayerIds.add(player.id));
         scene.snakes.forEach((snake, id) => {
           if (!activePlayerIds.has(id)) {
             snake.destroy();
@@ -112,7 +112,7 @@ class SocketManager {
             const currentSnake = scene.snakes.get(player.id);
             if (currentSnake) {
               // Update existing snake
-              if (player.id === playerId) {
+              if (player.id === this.room?.sessionId) {
                 scene.scoreText.setText(`Score: ${player.snake.score}`);
               }
 

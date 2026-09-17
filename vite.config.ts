@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite';
+import { execSync } from 'child_process';
+
+const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+const buildTime = new Date().toISOString();
 
 export default defineConfig({
+  define: {
+    __BUILD_INFO__: JSON.stringify({ commitHash, buildTime }),
+  },
   server: {
     proxy: {
       '/api': {
