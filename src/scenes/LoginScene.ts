@@ -1,4 +1,5 @@
 import InputText from "phaser3-rex-plugins/plugins/inputtext";
+import { ClientIdManager } from "../utils/clientIdManager";
 
 export class LoginScene extends Phaser.Scene {
     private passwordText!: InputText
@@ -13,6 +14,8 @@ export class LoginScene extends Phaser.Scene {
     }
 
     create() {
+        // Generate or retrieve client ID on first app load
+        ClientIdManager.getOrCreateClientId();
 
         const userData = localStorage.getItem('userData');
 

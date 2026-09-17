@@ -1,6 +1,7 @@
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, HighScore } from '../Snake';
 import { Food } from '../Food';
+import { LocalScoresManager } from '../utils/localScoresManager';
 
 interface SnakeColors {
   head: string;
@@ -235,6 +236,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.createColorSwatches();
+    this.displayTopLocalScores();
 
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
@@ -280,6 +282,29 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private displayTopLocalScores(): void {
+    const topScores = LocalScoresManager.getTopScores(5);
+
+    if (topScores.length > 0) {
+      const SCORES_X = 100;
+      let SCORES_Y = 380;
+
+      this.add.text(SCORES_X, SCORES_Y, 'YOUR TOP SCORES:', {
+        fontSize: '18px',
+        color: '#ffff00',
+      });
+
+      SCORES_Y += 25;
+      topScores.forEach((score, index) => {
+        const date = new Date(score.timestamp).toLocaleDateString();
+        this.add.text(SCORES_X, SCORES_Y + index * 20, `#${index + 1}: ${score.score} (${date})`, {
+          fontSize: '16px',
+          color: '#ffffff',
+        });
+      });
+    }
+  }
+
   startGame() {
     console.log("[GameScene] Requesting game start");
     socketManager.send({ event: 'startGame' });
@@ -315,6 +340,12 @@ export class GameScene extends Phaser.Scene {
     console.log("[GameScene] Game over callback", payload);
     this.isGameOver = true;
     this.clearGameOverOverlay();
+
+    // Save the player's score to local storage
+    const playerRanking = payload.rankings.find(r => r.id === this.playerId);
+    if (playerRanking) {
+      LocalScoresManager.saveScore(playerRanking.score);
+    }
 
     const topScores: HighScore[] = (await getHighScores()).slice(0, 3);
 
