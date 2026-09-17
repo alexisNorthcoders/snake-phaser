@@ -99,8 +99,8 @@ class SocketManager {
 
       this.room.onStateChange((state) => {
         if (state.hasGameStarted) {
-          if (!scene.gameStarted) {
-            // Game just started: initialize food list
+          if (!scene.gameStarted || scene.food.length === 0) {
+            // Game just started, or a new round began: initialize food list
             scene.gameStarted = true;
             scene.food.length = 0;
             state.foodCoordinates.forEach(food => {
