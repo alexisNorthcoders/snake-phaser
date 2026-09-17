@@ -124,6 +124,8 @@ class SocketManager {
           }
         });
 
+        this.updateScoreboard(scene, state, activePlayerIds);
+
         state.players.forEach((player) => {
           if (player.snake) {
             const currentSnake = scene.snakes.get(player.id);
@@ -164,6 +166,48 @@ class SocketManager {
       console.error("[SocketManager] Could not connect to server:", error);
       this.scheduleReconnect();
     }
+  }
+
+  private updateScoreboard(scene: GameScene, state: GameState, activePlayerIds: Set<string>) {
+    const MAX_VISIBLE_ROWS = 10;
+    const SCOREBOARD_X = 600;
+    const SCOREBOARD_Y = 50;
+    const SCOREBOARD_HEADER_HEIGHT = 26;
+    const ROW_HEIGHT = 22;
+    const ROW_PADDING_X = 10;
+
+    // Drop rows for players no longer present, mirroring the snake cleanup above.
+    scene.scoreboardTexts.forEach((text, id) => {
+      if (!activePlayerIds.has(id)) {
+        text.destroy();
+        scene.scoreboardTexts.delete(id);
+      }
+    });
+
+    const ranked = Array.from(state.players.values())
+      .filter((p) => p.snake)
+      .sort((a, b) => (b.snake?.score ?? 0) - (a.snake?.score ?? 0))
+      .slice(0, MAX_VISIBLE_ROWS);
+
+    ranked.forEach((player, index) => {
+      const y = SCOREBOARD_Y + SCOREBOARD_HEADER_HEIGHT + index * ROW_HEIGHT;
+      const isDead = !!player.snake?.isDead;
+      const label = `${player.name || 'Player'}: ${player.snake?.score ?? 0}`;
+      const color = isDead ? '#888888' : '#ffffff';
+
+      let row = scene.scoreboardTexts.get(player.id);
+      if (!row) {
+        row = scene.add.text(SCOREBOARD_X + ROW_PADDING_X, y, label, {
+          fontSize: '14px',
+          color,
+        }).setScrollFactor(0).setDepth(10).setVisible(scene.scoreboardVisible);
+        scene.scoreboardTexts.set(player.id, row);
+      } else {
+        row.setText(label).setColor(color).setY(y);
+      }
+    });
+
+    scene.scoreboardBg.setSize(190, SCOREBOARD_HEADER_HEIGHT + ranked.length * ROW_HEIGHT);
   }
 
   private handleLeave(code: number) {

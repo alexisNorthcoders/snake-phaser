@@ -43,7 +43,7 @@ Features from the old p5.js project (`p5_snake_game`) that were not fully carrie
 
 ## 4. Other players' live scores not rendered
 
-- [ ] Render a live scoreboard for all connected players, not just the local one.
+- [x] Render a live scoreboard for all connected players, not just the local one.
 
 **Current state:** `state.players` (Colyseus) carries every player's score, but `SocketManager.ts:63` only updates `scoreText` for the local player — other players' scores are never shown.
 

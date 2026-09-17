@@ -24,6 +24,10 @@ export class GameScene extends Phaser.Scene {
   public scoreText!: Phaser.GameObjects.Text;
   public pingText!: Phaser.GameObjects.Text;
   public playerNameText!: Phaser.GameObjects.Text;
+  public scoreboardTexts: Map<string, Phaser.GameObjects.Text> = new Map();
+  public scoreboardBg!: Phaser.GameObjects.Rectangle;
+  public scoreboardHeader!: Phaser.GameObjects.Text;
+  public scoreboardVisible: boolean = false;
   public isGameOver: boolean = false;
   public gameStarted: boolean = false;
   public playerId: string = '';
@@ -108,6 +112,31 @@ export class GameScene extends Phaser.Scene {
       .on('pointerdown', () => {
         this.logout();
       });
+
+    const SCOREBOARD_X = 600;
+    const SCOREBOARD_Y = 50;
+    const SCOREBOARD_WIDTH = 190;
+    const SCOREBOARD_HEADER_HEIGHT = 26;
+
+    this.scoreboardBg = this.add.rectangle(SCOREBOARD_X, SCOREBOARD_Y, SCOREBOARD_WIDTH, SCOREBOARD_HEADER_HEIGHT, 0x000000, 0.6)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(10)
+      .setVisible(false);
+
+    this.scoreboardHeader = this.add.text(SCOREBOARD_X + 10, SCOREBOARD_Y + 4, 'SCOREBOARD', {
+      fontSize: '16px',
+      color: '#ff4444',
+    }).setScrollFactor(0).setDepth(10).setVisible(false);
+
+    this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
+      event.preventDefault();
+      this.setScoreboardVisible(true);
+    });
+    this.input.keyboard?.on('keyup-TAB', (event: KeyboardEvent) => {
+      event.preventDefault();
+      this.setScoreboardVisible(false);
+    });
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
 
@@ -331,6 +360,18 @@ export class GameScene extends Phaser.Scene {
     this.gameOverObjects = [];
   }
 
+  private setScoreboardVisible(visible: boolean) {
+    this.scoreboardVisible = visible;
+    this.scoreboardBg?.setVisible(visible);
+    this.scoreboardHeader?.setVisible(visible);
+    this.scoreboardTexts.forEach((text) => text.setVisible(visible));
+  }
+
+  private clearScoreboard() {
+    this.scoreboardTexts.forEach((text) => text.destroy());
+    this.scoreboardTexts.clear();
+  }
+
   onConnectionLost() {
     this.reconnectText?.destroy();
     this.reconnectText = this.add.text(10, 40, 'Reconnecting...', {
@@ -380,6 +421,8 @@ export class GameScene extends Phaser.Scene {
     this.isGameOver = false;
     this.gameConfigured = false;
     this.gameOverObjects = [];
+    this.scoreboardTexts = new Map();
+    this.scoreboardVisible = false;
   }
 
   shutdown() {
@@ -389,6 +432,7 @@ export class GameScene extends Phaser.Scene {
     // Clear game objects
     this.clearSnakesAndFood();
     this.clearGameOverOverlay();
+    this.clearScoreboard();
 
     // Remove keyboard listeners
     this.input.keyboard?.removeAllListeners();
@@ -397,6 +441,8 @@ export class GameScene extends Phaser.Scene {
     this.scoreText?.destroy();
     this.pingText?.destroy();
     this.playerNameText?.destroy();
+    this.scoreboardBg?.destroy();
+    this.scoreboardHeader?.destroy();
     this.welcomeText?.destroy();
     this.reconnectText?.destroy();
     this.reconnectText = null;
