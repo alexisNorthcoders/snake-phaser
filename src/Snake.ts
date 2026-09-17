@@ -107,6 +107,10 @@ export class Snake {
         graphics.strokeRect(eyeX2, eyeY, eyeSize, eyeSize)
     }
 
+    destroy(): void {
+        this.graphics.destroy()
+    }
+
     async stop(playerId: string, score: number, isAnonymous: boolean): Promise<void> {
         this.isDead = true
         this.colors.head = 'black'

@@ -23,6 +23,11 @@ export class Food {
         this.sprite?.setTexture(type)
     }
 
+    destroy(): void {
+        this.sprite?.destroy()
+        this.sprite = undefined
+    }
+
     public draw(): void {
         if (!this.sprite) {
 

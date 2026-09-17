@@ -269,8 +269,7 @@ export class GameScene extends Phaser.Scene {
       .on('pointerdown', () => {
         this.clearGameOverOverlay();
         this.isGameOver = false;
-        this.snakes.clear();
-        this.food = [];
+        this.clearSnakesAndFood();
         socketManager.send({ event: 'startGame' });
       });
 
@@ -280,6 +279,13 @@ export class GameScene extends Phaser.Scene {
   private clearGameOverOverlay() {
     this.gameOverObjects.forEach((obj) => obj.destroy());
     this.gameOverObjects = [];
+  }
+
+  private clearSnakesAndFood() {
+    this.snakes.forEach((snake) => snake.destroy());
+    this.snakes.clear();
+    this.food.forEach((f) => f.destroy());
+    this.food = [];
   }
 
   update(): void {
@@ -310,8 +316,7 @@ export class GameScene extends Phaser.Scene {
     socketManager.stopPingMeasurement();
 
     // Clear game objects
-    this.snakes.clear();
-    this.food = [];
+    this.clearSnakesAndFood();
     this.clearGameOverOverlay();
 
     // Remove keyboard listeners
