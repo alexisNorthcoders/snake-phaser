@@ -1,4 +1,4 @@
-import { Schema, type, ArraySchema, MapSchema } from "@colyseus/schema";
+import { Schema, type, ArraySchema } from "@colyseus/schema";
 import { FoodType } from "../Food";
 
 export class Food extends Schema {
@@ -8,7 +8,8 @@ export class Food extends Schema {
     @type("string") type: FoodType = "redApple";
 }
 
-export class TailSegment extends Schema {
+/** Mirrors the server's `Coordinates`, which backs tail segments, speed and direction. */
+export class Coordinates extends Schema {
     @type("number") x: number = 0;
     @type("number") y: number = 0;
 }
@@ -22,10 +23,14 @@ export class SnakeColours extends Schema {
 export class SnakeState extends Schema {
     @type("number") x: number = 0;
     @type("number") y: number = 0;
+    @type([Coordinates]) tail = new ArraySchema<Coordinates>();
+    @type("boolean") isDead: boolean = false;
     @type("number") score: number = 0;
     @type("number") size: number = 0;
-    @type("boolean") isDead: boolean = false;
-    @type([TailSegment]) tail = new ArraySchema<TailSegment>();
+    @type(Coordinates) speed = new Coordinates();
+    @type(Coordinates) direction = new Coordinates();
+    @type("string") type: string = "player";
+    @type("string") playerId: string = "";
 }
 
 export class Player extends Schema {
@@ -41,6 +46,6 @@ export class GameState extends Schema {
     @type("number") nextPositionIndex: number = 0;
     @type("number") aliveCount: number = 0;
     @type("number") backgroundNumber: number = 0;
+    @type([Player]) players = new ArraySchema<Player>();
     @type([Food]) foodCoordinates = new ArraySchema<Food>();
-    @type({ map: Player }) players = new MapSchema<Player>();
 }
