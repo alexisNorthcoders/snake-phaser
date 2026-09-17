@@ -11,7 +11,7 @@ Features from the old p5.js project (`p5_snake_game`) that were not fully carrie
 
 ## 1. Game-over flow is unwired
 
-- [ ] Implement game-over screen (ranked players, high scores) and wire up the `GAME_OVER` event.
+- [x] Implement game-over screen (ranked players, high scores) and wire up the `GAME_OVER` event.
 
 **Current state:** `GAME_OVER: "gameOver"` is defined in `src/SocketManager.ts:19` but no handler is ever registered for it, and `isGameOver` is never set to `true` anywhere in the new project.
 
@@ -21,7 +21,7 @@ Features from the old p5.js project (`p5_snake_game`) that were not fully carrie
 
 ## 2. No reconnect logic
 
-- [ ] Add reconnect/retry handling for dropped Colyseus connections.
+- [x] Add reconnect/retry handling for dropped Colyseus connections.
 
 **Current state:** `SocketManager.ts` has no handling for `room.onLeave` or any dropped-connection case — a network blip ends the session with no recovery.
 

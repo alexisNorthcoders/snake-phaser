@@ -41,6 +41,7 @@ export class GameScene extends Phaser.Scene {
   public name: string = '';
   private startButton?: Phaser.GameObjects.Text;
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
+  private reconnectText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super('GameScene');
@@ -238,12 +239,12 @@ export class GameScene extends Phaser.Scene {
     this.isGameOver = true;
     this.clearGameOverOverlay();
 
-    const panel = this.add.rectangle(400, 300, 360, 320, 0x000000, 0.8).setOrigin(0.5);
+    const panel = this.add.rectangle(400, 300, 360, 320, 0x000000, 0.8).setOrigin(0.5).setDepth(20);
 
     const title = this.add.text(400, 170, 'GAME OVER', {
       fontSize: '32px',
       color: '#ff4444',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(20);
 
     this.gameOverObjects.push(panel, title);
 
@@ -252,7 +253,7 @@ export class GameScene extends Phaser.Scene {
       const line = this.add.text(400, 220 + index * 28, `#${index + 1}: ${entry.name} - ${entry.score}`, {
         fontSize: '20px',
         color: '#ffffff',
-      }).setOrigin(0.5);
+      }).setOrigin(0.5).setDepth(20);
       this.gameOverObjects.push(line);
     });
 
@@ -263,6 +264,7 @@ export class GameScene extends Phaser.Scene {
       padding: { x: 10, y: 5 },
     })
       .setOrigin(0.5)
+      .setDepth(20)
       .setInteractive({ useHandCursor: true })
       .on('pointerover', () => playAgainButton.setStyle({ backgroundColor: '#00CC00' }))
       .on('pointerout', () => playAgainButton.setStyle({ backgroundColor: '#00AA00' }))
@@ -279,6 +281,27 @@ export class GameScene extends Phaser.Scene {
   private clearGameOverOverlay() {
     this.gameOverObjects.forEach((obj) => obj.destroy());
     this.gameOverObjects = [];
+  }
+
+  onConnectionLost() {
+    this.reconnectText?.destroy();
+    this.reconnectText = this.add.text(10, 40, 'Reconnecting...', {
+      fontSize: '20px',
+      color: '#ff0000',
+    }).setScrollFactor(0);
+  }
+
+  onReconnected() {
+    this.reconnectText?.destroy();
+    this.reconnectText = null;
+  }
+
+  onReconnectFailed() {
+    this.reconnectText?.destroy();
+    this.reconnectText = this.add.text(10, 40, 'Connection lost. Please refresh the page.', {
+      fontSize: '20px',
+      color: '#ff0000',
+    }).setScrollFactor(0);
   }
 
   private clearSnakesAndFood() {
@@ -327,5 +350,7 @@ export class GameScene extends Phaser.Scene {
     this.pingText?.destroy();
     this.playerNameText?.destroy();
     this.welcomeText?.destroy();
+    this.reconnectText?.destroy();
+    this.reconnectText = null;
   }
 }

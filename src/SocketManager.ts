@@ -9,6 +9,12 @@ class SocketManager {
   private room: Room<GameState> | null = null;
   private pingInterval: number | null = null;
   private lastPingTime: number = 0;
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts: number = 10;
+  private readonly reconnectDelayMs: number = 3000;
+  private reconnectTimeoutHandle: number | null = null;
+  private intentionalClose: boolean = false;
+  private lastConnectArgs: { playerId: string; token: string; scene: GameScene } | null = null;
 
   // Match the message types with the server
   static messageTypes = {
@@ -22,6 +28,9 @@ class SocketManager {
   };
 
   async connect(playerId: string, token: string, scene: GameScene) {
+    this.lastConnectArgs = { playerId, token, scene };
+    this.intentionalClose = false;
+
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
@@ -34,6 +43,14 @@ class SocketManager {
       });
 
       console.log("[SocketManager] Connected to room:", this.room.roomId);
+
+      const wasReconnecting = this.reconnectAttempts > 0;
+      this.reconnectAttempts = 0;
+      if (wasReconnecting) {
+        scene.onReconnected?.();
+      }
+
+      this.room.onLeave((code) => this.handleLeave(code));
 
       // Set up all message handlers during connection
       this.room.onMessage(SocketManager.messageTypes.GAME_STARTED, () => {
@@ -145,7 +162,42 @@ class SocketManager {
 
     } catch (error) {
       console.error("[SocketManager] Could not connect to server:", error);
+      this.scheduleReconnect();
     }
+  }
+
+  private handleLeave(code: number) {
+    if (this.intentionalClose) {
+      return;
+    }
+
+    console.warn("[SocketManager] Room connection lost, code:", code);
+    this.stopPingMeasurement();
+    this.lastConnectArgs?.scene.onConnectionLost?.();
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimeoutHandle !== null || !this.lastConnectArgs) {
+      return;
+    }
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error("[SocketManager] Maximum reconnect attempts reached, giving up.");
+      this.lastConnectArgs.scene.onReconnectFailed?.();
+      return;
+    }
+
+    this.reconnectAttempts++;
+    console.log(`[SocketManager] Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelayMs}ms`);
+
+    this.reconnectTimeoutHandle = window.setTimeout(() => {
+      this.reconnectTimeoutHandle = null;
+      if (this.lastConnectArgs) {
+        const { playerId, token, scene } = this.lastConnectArgs;
+        this.connect(playerId, token, scene);
+      }
+    }, this.reconnectDelayMs);
   }
 
   send(data: any) {
@@ -161,6 +213,11 @@ class SocketManager {
   }
 
   close() {
+    this.intentionalClose = true;
+    if (this.reconnectTimeoutHandle !== null) {
+      window.clearTimeout(this.reconnectTimeoutHandle);
+      this.reconnectTimeoutHandle = null;
+    }
     this.room?.leave();
     this.room = null;
     this.client = null;
