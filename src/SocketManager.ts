@@ -46,6 +46,15 @@ class SocketManager {
         }
       });
 
+      this.room.onMessage(SocketManager.messageTypes.GAME_OVER, (payload) => {
+        console.log("[SocketManager] Received gameOver event", payload);
+        scene.isGameOver = true;
+
+        if (typeof scene.onGameOver === 'function') {
+          scene.onGameOver(payload);
+        }
+      });
+
       this.room.onMessage(SocketManager.messageTypes.PONG, () => {
         const latency = Date.now() - this.lastPingTime;
         scene.pingText?.setText(`Ping: ${latency}ms`);

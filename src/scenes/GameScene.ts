@@ -8,6 +8,17 @@ interface SnakeColors {
   eyes: string;
 }
 
+interface RankingEntry {
+  id: string;
+  name: string;
+  score: number;
+}
+
+interface GameOverPayload {
+  winnerId?: string;
+  rankings: RankingEntry[];
+}
+
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
   public scoreText!: Phaser.GameObjects.Text;
@@ -29,6 +40,7 @@ export class GameScene extends Phaser.Scene {
   };
   public name: string = '';
   private startButton?: Phaser.GameObjects.Text;
+  private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super('GameScene');
@@ -214,8 +226,60 @@ export class GameScene extends Phaser.Scene {
       this.welcomeText.destroy();
     }
 
+    // Remove game-over overlay, if a new round is starting from it
+    this.clearGameOverOverlay();
+
     // Initialize game state
     this.isGameOver = false;
+  }
+
+  onGameOver(payload: GameOverPayload) {
+    console.log("[GameScene] Game over callback", payload);
+    this.isGameOver = true;
+    this.clearGameOverOverlay();
+
+    const panel = this.add.rectangle(400, 300, 360, 320, 0x000000, 0.8).setOrigin(0.5);
+
+    const title = this.add.text(400, 170, 'GAME OVER', {
+      fontSize: '32px',
+      color: '#ff4444',
+    }).setOrigin(0.5);
+
+    this.gameOverObjects.push(panel, title);
+
+    const rankings = payload?.rankings ?? [];
+    rankings.forEach((entry, index) => {
+      const line = this.add.text(400, 220 + index * 28, `#${index + 1}: ${entry.name} - ${entry.score}`, {
+        fontSize: '20px',
+        color: '#ffffff',
+      }).setOrigin(0.5);
+      this.gameOverObjects.push(line);
+    });
+
+    const playAgainButton = this.add.text(400, 420, 'PLAY AGAIN', {
+      fontSize: '24px',
+      backgroundColor: '#00AA00',
+      color: '#FFFFFF',
+      padding: { x: 10, y: 5 },
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerover', () => playAgainButton.setStyle({ backgroundColor: '#00CC00' }))
+      .on('pointerout', () => playAgainButton.setStyle({ backgroundColor: '#00AA00' }))
+      .on('pointerdown', () => {
+        this.clearGameOverOverlay();
+        this.isGameOver = false;
+        this.snakes.clear();
+        this.food = [];
+        socketManager.send({ event: 'startGame' });
+      });
+
+    this.gameOverObjects.push(playAgainButton);
+  }
+
+  private clearGameOverOverlay() {
+    this.gameOverObjects.forEach((obj) => obj.destroy());
+    this.gameOverObjects = [];
   }
 
   update(): void {
@@ -238,6 +302,7 @@ export class GameScene extends Phaser.Scene {
     this.gameStarted = false;
     this.isGameOver = false;
     this.gameConfigured = false;
+    this.gameOverObjects = [];
   }
 
   shutdown() {
@@ -247,6 +312,7 @@ export class GameScene extends Phaser.Scene {
     // Clear game objects
     this.snakes.clear();
     this.food = [];
+    this.clearGameOverOverlay();
 
     // Remove keyboard listeners
     this.input.keyboard?.removeAllListeners();

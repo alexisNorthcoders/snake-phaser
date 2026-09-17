@@ -11,6 +11,11 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:4002',
         ws: true,
+      },
+      '/colyseus': {
+        target: 'ws://localhost:4002',
+        ws: true,
+        rewrite: (path) => path.replace(/^\/colyseus/, ''),
       }
     },
   },
