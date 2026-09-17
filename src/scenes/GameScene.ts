@@ -19,6 +19,11 @@ interface GameOverPayload {
   rankings: RankingEntry[];
 }
 
+function getRandomColor(): string {
+  const value = Math.floor(Math.random() * 0xffffff);
+  return `#${value.toString(16).padStart(6, '0')}`;
+}
+
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
   public scoreText!: Phaser.GameObjects.Text;
@@ -44,6 +49,7 @@ export class GameScene extends Phaser.Scene {
   };
   public name: string = '';
   private startButton?: Phaser.GameObjects.Text;
+  private colorSwatches: Phaser.GameObjects.GameObject[] = [];
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
 
@@ -56,6 +62,42 @@ export class GameScene extends Phaser.Scene {
       event: 'move',
       key: direction
     });
+  }
+
+  private sendColorUpdate(): void {
+    socketManager.send({ event: 'updatePlayer', colours: this.snakeColors });
+  }
+
+  private createColorSwatches(): void {
+    const label = this.add.text(400, 335, 'Click to randomize colors', {
+      fontSize: '16px',
+      color: '#cccccc',
+    }).setOrigin(0.5);
+
+    const head = this.add.circle(350, 365, 15, Phaser.Display.Color.HexStringToColor(this.snakeColors.head).color)
+      .setInteractive({ useHandCursor: true });
+    const body = this.add.rectangle(400, 365, 30, 30, Phaser.Display.Color.HexStringToColor(this.snakeColors.body).color)
+      .setInteractive({ useHandCursor: true });
+    const eyes = this.add.rectangle(450, 365, 20, 20, Phaser.Display.Color.HexStringToColor(this.snakeColors.eyes).color)
+      .setInteractive({ useHandCursor: true });
+
+    head.on('pointerdown', () => {
+      this.snakeColors.head = getRandomColor();
+      head.setFillStyle(Phaser.Display.Color.HexStringToColor(this.snakeColors.head).color);
+      this.sendColorUpdate();
+    });
+    body.on('pointerdown', () => {
+      this.snakeColors.body = getRandomColor();
+      body.setFillStyle(Phaser.Display.Color.HexStringToColor(this.snakeColors.body).color);
+      this.sendColorUpdate();
+    });
+    eyes.on('pointerdown', () => {
+      this.snakeColors.eyes = getRandomColor();
+      eyes.setFillStyle(Phaser.Display.Color.HexStringToColor(this.snakeColors.eyes).color);
+      this.sendColorUpdate();
+    });
+
+    this.colorSwatches = [label, head, body, eyes];
   }
 
   preload() {
@@ -192,6 +234,8 @@ export class GameScene extends Phaser.Scene {
       color: '#fff',
     }).setOrigin(0.5);
 
+    this.createColorSwatches();
+
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
 
@@ -255,6 +299,10 @@ export class GameScene extends Phaser.Scene {
     if (this.welcomeText) {
       this.welcomeText.destroy();
     }
+
+    // Remove color customization swatches
+    this.colorSwatches.forEach((obj) => obj.destroy());
+    this.colorSwatches = [];
 
     // Remove game-over overlay, if a new round is starting from it
     this.clearGameOverOverlay();
@@ -444,6 +492,8 @@ export class GameScene extends Phaser.Scene {
     this.scoreboardBg?.destroy();
     this.scoreboardHeader?.destroy();
     this.welcomeText?.destroy();
+    this.colorSwatches.forEach((obj) => obj.destroy());
+    this.colorSwatches = [];
     this.reconnectText?.destroy();
     this.reconnectText = null;
   }

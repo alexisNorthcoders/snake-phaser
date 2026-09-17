@@ -24,6 +24,7 @@ class SocketManager {
     GAME_STARTED: "gameStarted",
     NEW_PLAYER: "newPlayer",
     GAME_OVER: "gameOver",
+    UPDATE_PLAYER: "updatePlayer",
     PING: "ping",
     PONG: "pong"
   };

@@ -63,10 +63,12 @@ Features from the old p5.js project (`p5_snake_game`) that were not fully carrie
 
 ## 6. Snake color customization dropped
 
-- [ ] Decide whether to bring back pre-match color customization (head/body/eyes), or leave it as an intentional simplification.
+- [x] Decide whether to bring back pre-match color customization (head/body/eyes), or leave it as an intentional simplification.
 
 **Current state:** Colors are hardcoded in `src/scenes/GameScene.ts:25-29` (`head: '#00FF00'`, `body: '#008000'`, `eyes: '#FFFFFF'`). No UI exists to change them.
 
 **Old reference:** Old `sketch.js` `mousePressed()` / `updateColors()` — clicking swatches in the waiting room randomized head/body/eye colors and sent the update to the server.
 
 **Server side:** the Colyseus room in `/root/Projects/snake-colyseus` already accepts `colours` on join (see `SocketManager.ts`'s `joinOrCreate` call) — an `updatePlayer` message to update colors mid-lobby may need to be re-added there if not already present.
+
+**Note (decision + implementation):** brought it back, with one simplification over the old game — clicking a swatch randomizes and immediately syncs to the server in one step, instead of requiring a separate "Update Colours" button. `GameScene.createColorSwatches()` adds head/body/eyes swatches to the waiting room; each click updates `snakeColors` locally and sends a new `updatePlayer` message (`SocketManager.ts`). `SnakeRoom.ts` in `snake-colyseus` gained an `updatePlayer` handler that mutates `player.colours` while `!hasGameStarted`, which Colyseus syncs to all clients automatically.
