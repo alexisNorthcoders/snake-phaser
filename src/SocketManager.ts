@@ -60,48 +60,19 @@ class SocketManager {
         scene.pingText?.setText(`Ping: ${latency}ms`);
       });
 
-      // Handle state changes for snake positions
-      this.room.onStateChange((state) => {
-
-        state.players.forEach((player) => {
-          if (player.snake) {
-            const currentSnake = scene.snakes.get(player.id);
-            if (currentSnake) {
-              // Update existing snake
-              if (player.id === playerId) {
-                scene.scoreText.setText(`Score: ${player.snake.score}`);
-              }
-
-              if (!currentSnake.isDead) {
-                currentSnake.tail = player.snake.tail;
-                currentSnake.food = player.snake.score;
-                currentSnake.position({ x: player.snake.x, y: player.snake.y });
-
-                if (player.snake.isDead) {
-                  currentSnake.stop(player.id, player.snake.score, false);
-                }
-              }
-            } else {
-
-              const newSnake = new Snake(
-                scene,
-                player.snake.x,
-                player.snake.y,
-                player.type,
-                player.colours,
-                player.snake.size
-              );
-              scene.snakes.set(player.id, newSnake);
-            }
-          }
-        });
-      })
-
+      // Handle state changes for snake positions and food
       this.room.onStateChange((state) => {
         if (state.hasGameStarted) {
           if (!scene.gameStarted || scene.food.length === 0) {
-            // Game just started, or a new round began: initialize food list
+            // Game just started, or a new round began: discard any leftover
+            // snake/food graphics from the previous round before rebuilding
+            // from this (authoritative) snapshot, so stale tails/positions
+            // from a mid-transition state broadcast can't linger on screen.
+            scene.snakes.forEach((snake) => snake.destroy());
+            scene.snakes.clear();
+
             scene.gameStarted = true;
+            scene.food.forEach((f) => f.destroy());
             scene.food.length = 0;
             state.foodCoordinates.forEach(food => {
               const newFood = new Food(scene, { x: food.x, y: food.y }, food.index, food.type);
@@ -124,6 +95,50 @@ class SocketManager {
             });
           }
         }
+
+        // Drop snakes for players no longer present in the room state
+        // (e.g. disconnected mid-round) so their last frame doesn't freeze
+        // on screen forever.
+        const activePlayerIds = new Set(Array.from(state.players.keys()));
+        scene.snakes.forEach((snake, id) => {
+          if (!activePlayerIds.has(id)) {
+            snake.destroy();
+            scene.snakes.delete(id);
+          }
+        });
+
+        state.players.forEach((player) => {
+          if (player.snake) {
+            const currentSnake = scene.snakes.get(player.id);
+            if (currentSnake) {
+              // Update existing snake
+              if (player.id === playerId) {
+                scene.scoreText.setText(`Score: ${player.snake.score}`);
+              }
+
+              if (!currentSnake.isDead) {
+                currentSnake.tail = player.snake.tail.map((segment) => ({ x: segment.x, y: segment.y }));
+                currentSnake.food = player.snake.score;
+                currentSnake.position({ x: player.snake.x, y: player.snake.y });
+
+                if (player.snake.isDead) {
+                  currentSnake.stop(player.id, player.snake.score, false);
+                }
+              }
+            } else {
+
+              const newSnake = new Snake(
+                scene,
+                player.snake.x,
+                player.snake.y,
+                player.type,
+                player.colours,
+                player.snake.size
+              );
+              scene.snakes.set(player.id, newSnake);
+            }
+          }
+        });
       });
 
       this.startPingMeasurement(scene);
