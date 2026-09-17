@@ -53,7 +53,7 @@ Features from the old p5.js project (`p5_snake_game`) that were not fully carrie
 
 ## 5. Background rotation half-wired
 
-- [ ] Either wire up random background rotation end-to-end, or remove the dead code.
+- [x] Either wire up random background rotation end-to-end, or remove the dead code.
 
 **Current state:** `drawBackground()` (`src/utils.ts:17`) exists and background images are preloaded, but nothing calls it. There's no `backgroundNumber` (or similar) field on the Colyseus `GameState` schema (`src/schemas/Food.ts`) to drive it.
 
