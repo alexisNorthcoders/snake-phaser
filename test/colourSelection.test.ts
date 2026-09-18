@@ -40,3 +40,36 @@ test('setColours replaces the committed colours', () => {
   selection.setColours({ head: '#111111', body: '#222222', eyes: '#333333' });
   assert.equal(selection.outlinedColour(), '#222222');
 });
+
+test('hover changes the displayed colours but not the committed ones', () => {
+  const selection = createColourSelection(start);
+  selection.select('head');
+  selection.hover('#111111');
+
+  assert.deepEqual(selection.displayedColours(), { head: '#111111', body: '#2a9d3f', eyes: '#ffffff' });
+  assert.deepEqual(selection.colours, start);
+  assert.equal(selection.outlinedColour(), '#e63946');
+});
+
+test('unhover reverts the displayed colours', () => {
+  const selection = createColourSelection(start);
+  selection.hover('#111111');
+  selection.unhover();
+  assert.deepEqual(selection.displayedColours(), start);
+});
+
+test('select clears the hover', () => {
+  const selection = createColourSelection(start);
+  selection.hover('#111111');
+  selection.select('eyes');
+  assert.deepEqual(selection.displayedColours(), start);
+});
+
+test('pick after hover commits the picked colour', () => {
+  const selection = createColourSelection(start);
+  selection.hover('#222222');
+  selection.pick('#222222');
+  selection.unhover();
+  assert.deepEqual(selection.colours, { ...start, body: '#222222' });
+  assert.deepEqual(selection.displayedColours(), selection.colours);
+});
