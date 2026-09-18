@@ -71,13 +71,20 @@ export interface AmbientSnakeOptions {
     maxLength?: number
     /** Chance per step of preferring a move that closes on the target fruit. */
     seekChance?: number
+    /** Whether a snake with no way forward or sideways backs out tail-first (default), or just takes any other free neighbour. */
+    reverses?: boolean
+    /** Where to start, head first, and the way it faces; by default a run along a free stretch of the top lanes. */
+    start?: { cells: Cell[]; heading: Cell }
 }
 
 export interface AmbientSnake {
     /** Head first. */
     readonly cells: readonly Cell[]
-    /** Moves one cell, reversing out of dead ends; stays put only when boxed in completely. */
-    step(): void
+    /**
+     * Moves one cell, reversing out of dead ends. Returns false, staying put, only when boxed in completely:
+     * no free move of any kind.
+     */
+    step(): boolean
 }
 
 const DIRECTIONS: Cell[] = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }]
@@ -93,12 +100,14 @@ export function createAmbientSnake({
     onEat = () => {},
     maxLength = 9,
     seekChance = 0.3,
+    reverses = true,
+    start: given,
 }: AmbientSnakeOptions): AmbientSnake {
     const free = (cell: Cell, body: readonly Cell[]) =>
         inBand(grid, cell) && !blocked(cell) && !body.some((c) => c.x === cell.x && c.y === cell.y)
 
     // Start as a straight run heading right along a free stretch of the top two lanes.
-    let start: Cell[] | undefined
+    let start: Cell[] | undefined = given?.cells
     for (let y = 0; y < BAND_LANES && !start; y++) {
         for (let x = length - 1; x < grid.cols && !start; x++) {
             const run = Array.from({ length }, (_, i) => ({ x: x - i, y }))
@@ -107,7 +116,7 @@ export function createAmbientSnake({
     }
     if (!start) throw new Error('no free stretch of the band to start the ambient snake on')
     let cells: Cell[] = start
-    let heading = DIRECTIONS[0]
+    let heading = given?.heading ?? DIRECTIONS[0]
 
     const sameCell = (a: Cell, b: Cell) => a.x === b.x && a.y === b.y
     const distance = (a: Cell, b: Cell) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
@@ -168,7 +177,16 @@ export function createAmbientSnake({
             }
             if (next) {
                 advance(next, cells)
-                return
+                return true
+            }
+
+            if (!reverses) {
+                // Boxed in ahead and to the side; any other free neighbour is still a move (e.g. against the heading).
+                const rest = DIRECTIONS.filter((d) => free(at(d), body))
+                if (rest.length === 0) return false
+                heading = pick(rest)
+                advance(at(heading), cells)
+                return true
             }
 
             // Dead end (e.g. a blocked cell across both lanes): back out the way we came and circulate the other way.
@@ -180,10 +198,11 @@ export function createAmbientSnake({
             const rAt = (d: Cell): Cell => ({ x: reversed[0].x + d.x, y: reversed[0].y + d.y })
             const rSideways = DIRECTIONS.filter((d) => d.x * tailDir.x + d.y * tailDir.y === 0)
             const options = [tailDir, ...rSideways].filter((d) => free(rAt(d), rBody))
-            if (options.length === 0) return
+            if (options.length === 0) return false
             const dir = options[0] === tailDir ? tailDir : pick(options)
             heading = dir
             advance(rAt(dir), reversed)
+            return true
         },
     }
 }
