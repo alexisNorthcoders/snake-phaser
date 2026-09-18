@@ -60,7 +60,7 @@ export class Snake {
         }
 
         this.bodyGraphics = this.scene.add.graphics()
-        this.bodyGraphics.setDepth(10)
+        this.bodyGraphics.setDepth(9)
         this.bodyMask = this.scene.make.graphics({}, false)
         this.bodyGraphics.setMask(this.bodyMask.createGeometryMask())
 
@@ -200,6 +200,7 @@ export class Snake {
 
     destroy(): void {
         this.graphics.destroy()
+        this.bodyGraphics.clearMask(true)
         this.bodyGraphics.destroy()
         this.bodyMask.destroy()
     }
