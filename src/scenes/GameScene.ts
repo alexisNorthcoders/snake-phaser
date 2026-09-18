@@ -1,7 +1,8 @@
 import socketManager from '../SocketManager';
-import { Snake, getHighScores, getLeaderboard, HighScore } from '../Snake';
+import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
 import { LocalScoresManager } from '../utils/localScoresManager';
+import { ClientIdManager } from '../utils/clientIdManager';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 
 interface SnakeColors {
@@ -408,6 +409,16 @@ export class GameScene extends Phaser.Scene {
     const playerRanking = payload.rankings.find(r => r.id === this.playerId);
     if (playerRanking) {
       LocalScoresManager.saveScore(playerRanking.score);
+
+      // For anonymous players, also try to submit score to server
+      if (this.name === 'anonymous') {
+        const clientId = ClientIdManager.getOrCreateClientId();
+        const result = await postAnonymousScore(clientId, playerRanking.score);
+        if (!result.success) {
+          console.warn('[GameScene] Failed to submit score to server:', result.message);
+          // Score is saved locally, continue gracefully
+        }
+      }
     }
 
     const score = playerRanking?.score ?? 0;

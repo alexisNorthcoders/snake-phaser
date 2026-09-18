@@ -160,6 +160,40 @@ async function postUserScore(score: number): Promise<void> {
     }
 }
 
+export async function postAnonymousScore(clientId: string, score: number): Promise<{ success: boolean; message: string }> {
+    try {
+        const response = await fetch("/api/scores/anonymous", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ clientId, score }),
+        });
+
+        if (response.status === 429) {
+            return {
+                success: false,
+                message: "Too many submissions. Please wait a minute before submitting another score.",
+            };
+        }
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Failed to post anonymous score: ${response.status} ${err}`);
+        }
+
+        const data = await response.json();
+        console.log("✅ Anonymous score posted:", data.message);
+        return { success: true, message: data.message };
+    } catch (error) {
+        console.error("❌ Error posting anonymous score:", error);
+        return {
+            success: false,
+            message: "Failed to submit score. Score saved locally.",
+        };
+    }
+}
+
 export interface HighScore {
     username: string;
     score: number;

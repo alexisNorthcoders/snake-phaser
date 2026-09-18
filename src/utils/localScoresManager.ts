@@ -9,25 +9,54 @@ export interface LocalScore {
 const SCORES_KEY = 'localScores';
 
 export class LocalScoresManager {
+  /**
+   * Save a score to localStorage for the current client.
+   *
+   * Edge case: If localStorage is cleared by the user, their anonymous scores are lost permanently.
+   * This is by design — persistence across sessions requires authentication.
+   * Users can authenticate after a game to ensure their scores are persisted in the server database.
+   */
   static saveScore(score: number): void {
     const clientId = ClientIdManager.getOrCreateClientId();
     const timestamp = Date.now();
 
-    const allScores = this.getAllScores();
+    try {
+      const allScores = this.getAllScores();
 
-    allScores.push({
-      clientId,
-      score,
-      timestamp
-    });
+      allScores.push({
+        clientId,
+        score,
+        timestamp
+      });
 
-    localStorage.setItem(SCORES_KEY, JSON.stringify(allScores));
-    console.log(`[LocalScoresManager] Saved score: ${score} for client ${clientId}`);
+      localStorage.setItem(SCORES_KEY, JSON.stringify(allScores));
+      console.log(`[LocalScoresManager] Saved score: ${score} for client ${clientId}`);
+    } catch (error) {
+      console.error('[LocalScoresManager] Failed to save score to localStorage:', error);
+
+      // Check if localStorage is disabled or quota exceeded
+      if (error instanceof Error) {
+        if (error.name === 'QuotaExceededError') {
+          console.warn('[LocalScoresManager] localStorage quota exceeded. Consider clearing old games or logging in to persist scores on the server.');
+        } else if (error.name === 'SecurityError' || error.message?.includes('disabled')) {
+          console.warn('[LocalScoresManager] localStorage is disabled or not available in this context.');
+        }
+      }
+
+      // Notify but don't crash the game
+      // The score will be lost, but the game continues to work
+    }
   }
 
   static getAllScores(): LocalScore[] {
-    const scoresJson = localStorage.getItem(SCORES_KEY);
-    return scoresJson ? JSON.parse(scoresJson) : [];
+    try {
+      const scoresJson = localStorage.getItem(SCORES_KEY);
+      return scoresJson ? JSON.parse(scoresJson) : [];
+    } catch (error) {
+      console.error('[LocalScoresManager] Failed to read scores from localStorage:', error);
+      // Return empty array if we can't read from localStorage
+      return [];
+    }
   }
 
   static getClientScores(): LocalScore[] {
@@ -49,10 +78,15 @@ export class LocalScoresManager {
   }
 
   static clearClientScores(): void {
-    const clientId = ClientIdManager.getOrCreateClientId();
-    const allScores = this.getAllScores();
-    const filteredScores = allScores.filter(s => s.clientId !== clientId);
-    localStorage.setItem(SCORES_KEY, JSON.stringify(filteredScores));
-    console.log(`[LocalScoresManager] Cleared scores for client ${clientId}`);
+    try {
+      const clientId = ClientIdManager.getOrCreateClientId();
+      const allScores = this.getAllScores();
+      const filteredScores = allScores.filter(s => s.clientId !== clientId);
+      localStorage.setItem(SCORES_KEY, JSON.stringify(filteredScores));
+      console.log(`[LocalScoresManager] Cleared scores for client ${clientId}`);
+    } catch (error) {
+      console.error('[LocalScoresManager] Failed to clear scores from localStorage:', error);
+      // Non-critical operation, continue gracefully
+    }
   }
 }
