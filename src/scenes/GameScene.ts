@@ -5,7 +5,7 @@ import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
 import { drawSnake } from '../SnakeDrawing';
 import { feature, localStorageOrNothing } from '../feature';
-import { createAppearanceStore, PALETTE } from '../appearanceStore';
+import { createAccountAppearanceStore, createAppearanceStore, PALETTE, type AccountAppearanceStore } from '../appearanceStore';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 
 interface SnakeColors {
@@ -57,6 +57,7 @@ export class GameScene extends Phaser.Scene {
   private colorSwatches: Phaser.GameObjects.GameObject[] = [];
   private colorPicker?: { close: () => void };
   private redrawPreview?: () => void;
+  private accountAppearance?: AccountAppearanceStore;
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
   private leaderboardObjects: Phaser.GameObjects.GameObject[] = [];
@@ -75,6 +76,11 @@ export class GameScene extends Phaser.Scene {
 
   private sendColorUpdate(): void {
     socketManager.send({ event: 'updatePlayer', colours: this.snakeColors });
+  }
+
+  /** Logged-in players' colours live on their account; only anonymous players use localStorage. */
+  private saveColours(): void {
+    (this.accountAppearance ?? appearanceStore).save(this.snakeColors);
   }
 
   private createColorSwatches(): void {
@@ -159,7 +165,7 @@ export class GameScene extends Phaser.Scene {
           .setInteractive({ useHandCursor: true });
         swatch.on('pointerdown', () => {
           this.snakeColors[part] = color;
-          appearanceStore.save(this.snakeColors);
+          this.saveColours();
           this.sendColorUpdate();
           this.redrawPreview?.();
           this.closeColorPicker();
@@ -331,8 +337,22 @@ export class GameScene extends Phaser.Scene {
       color: '#fff',
     }).setOrigin(0.5);
 
-    this.snakeColors = appearanceStore.load();
-    this.createColorSwatches();
+    if (this.name === 'anonymous') {
+      this.snakeColors = appearanceStore.load();
+      this.createColorSwatches();
+    } else {
+      // The preview stays hidden until the account's colours arrive, so it never flickers from random to saved.
+      this.accountAppearance = createAccountAppearanceStore({
+        fetch: (input, init) => fetch(input, init),
+        token: userData.token,
+      });
+      this.accountAppearance.load().then((colours) => {
+        if (!this.sys.isActive()) return;
+        this.snakeColors = colours;
+        this.createColorSwatches();
+        this.sendColorUpdate();
+      });
+    }
     this.displayLeaderboard();
 
     // connect to websockets
