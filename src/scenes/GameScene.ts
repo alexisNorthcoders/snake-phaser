@@ -7,6 +7,8 @@ import { drawSnake } from '../SnakeDrawing';
 import { isGuest } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
 import { createAccountAppearanceStore, createAppearanceStore, PALETTE, type AccountAppearanceStore } from '../appearanceStore';
+import InputText from 'phaser3-rex-plugins/plugins/inputtext';
+import { createNameStore, MAX_NAME_LENGTH } from '../nameStore';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 
 interface SnakeColors {
@@ -29,6 +31,7 @@ interface GameOverPayload {
 type PickerPart = keyof SnakeColors;
 
 const appearanceStore = createAppearanceStore(localStorageOrNothing());
+const nameStore = createNameStore(localStorageOrNothing());
 
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
@@ -60,6 +63,8 @@ export class GameScene extends Phaser.Scene {
   private colorPicker?: { close: () => void };
   private redrawPreview?: () => void;
   private accountAppearance?: AccountAppearanceStore;
+  private nameField?: InputText;
+  private nameLabel?: Phaser.GameObjects.Text;
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
   private leaderboardObjects: Phaser.GameObjects.GameObject[] = [];
@@ -83,6 +88,33 @@ export class GameScene extends Phaser.Scene {
   /** Logged-in players' colours live on their account; only anonymous players use localStorage. */
   private saveColours(): void {
     (this.accountAppearance ?? appearanceStore).save(this.snakeColors);
+  }
+
+  private createNameField(): void {
+    this.nameLabel = this.add.text(300, 460, 'Name:', { fontSize: '20px', color: '#ffffff' }).setOrigin(1, 0.5);
+    this.nameField = new InputText(this, 410, 460, 160, 34, {
+      backgroundColor: '#333',
+      fontSize: '20px',
+      color: '#fff',
+      type: 'text',
+      maxLength: MAX_NAME_LENGTH,
+      placeholder: 'anonymous',
+      text: nameStore.saved(),
+    });
+    this.add.existing(this.nameField);
+    this.nameField.on('textchange', (field: InputText) => {
+      this.name = nameStore.save(field.text);
+      this.playerNameText.setText(`Player: ${this.name}`);
+      this.welcomeText?.setText(`Welcome ${this.name}!`);
+      socketManager.send({ event: 'updatePlayer', name: this.name });
+    });
+  }
+
+  private destroyNameField(): void {
+    this.nameField?.destroy();
+    this.nameField = undefined;
+    this.nameLabel?.destroy();
+    this.nameLabel = undefined;
   }
 
   private setSwatchesVisible(visible: boolean): void {
@@ -246,8 +278,9 @@ export class GameScene extends Phaser.Scene {
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
-    this.name = userData.username;
     this.guest = isGuest(userData);
+    // Guests play under the name they picked last time; logged-in players keep their account username.
+    this.name = this.guest ? nameStore.load() : userData.username;
     this.playerId = String(userData.userId);
 
     this.playerNameText = this.add.text(400, 10, `Player: ${this.name}`, {
@@ -347,6 +380,7 @@ export class GameScene extends Phaser.Scene {
     if (this.guest) {
       this.snakeColors = appearanceStore.load();
       this.createColorSwatches();
+      this.createNameField();
     } else {
       // The swatches exist straight away but stay hidden until the account's colours (or the random fallback) arrive,
       // so the preview never flickers from random to saved. Hidden zones take no input, so picks can't race the load.
@@ -513,6 +547,8 @@ export class GameScene extends Phaser.Scene {
     if (this.welcomeText) {
       this.welcomeText.destroy();
     }
+
+    this.destroyNameField();
 
     // Remove color customization swatches
     this.closeColorPicker();
@@ -760,6 +796,7 @@ export class GameScene extends Phaser.Scene {
     this.scoreboardBg?.destroy();
     this.scoreboardHeader?.destroy();
     this.welcomeText?.destroy();
+    this.destroyNameField();
     this.closeColorPicker();
     this.colorSwatches.forEach((obj) => obj.destroy());
     this.colorSwatches = [];
