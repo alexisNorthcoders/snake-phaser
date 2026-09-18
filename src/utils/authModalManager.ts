@@ -1,4 +1,6 @@
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
+import { LocalScoresManager } from './localScoresManager';
+import { ClientIdManager } from './clientIdManager';
 
 export interface AuthModalConfig {
   playerName: string;
@@ -279,16 +281,68 @@ class AuthModalManager {
 
     if (response.ok) {
       const data = await response.json();
+      const token = data.accessToken;
+      const userId = data.userId;
+
       localStorage.setItem('userData', JSON.stringify({
-        token: data.accessToken,
+        token,
         username: username,
-        userId: data.userId,
+        userId,
       }));
+
+      // Migrate anonymous scores if any exist
+      await this.migrateAnonymousScores(token, userId);
 
       this.close();
       config.onAuthSuccess();
     } else {
       this.errorText.setText('Login failed. Check your credentials.');
+    }
+  }
+
+  private async migrateAnonymousScores(token: string, userId: string) {
+    const clientId = ClientIdManager.getClientId();
+    if (!clientId) {
+      console.log('[authModalManager] No client ID found, skipping score migration');
+      return;
+    }
+
+    const anonScores = LocalScoresManager.getClientScores();
+    if (anonScores.length === 0) {
+      console.log('[authModalManager] No anonymous scores to migrate');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/scores/migrate/${clientId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const migratedCount = data.count || 0;
+
+        // Clear anonymous scores from localStorage
+        LocalScoresManager.clearClientScores();
+
+        if (migratedCount > 0) {
+          console.log(`[authModalManager] ${migratedCount} score(s) migrated successfully`);
+          if (this.errorText) {
+            this.errorText.setText('Your scores have been saved!');
+          }
+        } else {
+          console.log('[authModalManager] No scores found to migrate');
+        }
+      } else {
+        console.error('[authModalManager] Score migration failed:', response.statusText);
+      }
+    } catch (error) {
+      console.error('[authModalManager] Score migration error:', error);
     }
   }
 
