@@ -166,7 +166,6 @@ export class GameScene extends Phaser.Scene {
         });
         return swatch;
       });
-      objects.push(...content);
     };
 
     // A future Skins tab is one more entry here.
@@ -188,6 +187,7 @@ export class GameScene extends Phaser.Scene {
       close: () => {
         this.input.keyboard?.off('keydown-ESC', onEsc);
         objects.forEach((obj) => obj.destroy());
+        content.forEach((obj) => obj.destroy());
       },
     };
   }
