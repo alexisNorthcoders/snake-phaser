@@ -353,18 +353,20 @@ export class GameScene extends Phaser.Scene {
       const SCORES_X = 100;
       let SCORES_Y = 380;
 
-      this.add.text(SCORES_X, SCORES_Y, 'YOUR TOP SCORES:', {
+      const header = this.add.text(SCORES_X, SCORES_Y, 'YOUR TOP SCORES:', {
         fontSize: '18px',
         color: '#ffff00',
       });
+      this.leaderboardObjects.push(header);
 
       SCORES_Y += 25;
       topScores.forEach((score, index) => {
         const date = new Date(score.timestamp).toLocaleDateString();
-        this.add.text(SCORES_X, SCORES_Y + index * 20, `#${index + 1}: ${score.score} (${date})`, {
+        const text = this.add.text(SCORES_X, SCORES_Y + index * 20, `#${index + 1}: ${score.score} (${date})`, {
           fontSize: '16px',
           color: '#ffffff',
         });
+        this.leaderboardObjects.push(text);
       });
     }
   }
@@ -376,6 +378,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     const leaderboard = await getLeaderboard();
+    // The round may have started while the fetch was in flight
+    if (this.gameStarted) return;
     const topLeaderboard = leaderboard.slice(0, 10);
 
     const BOARD_X = 50;
@@ -454,6 +458,9 @@ export class GameScene extends Phaser.Scene {
 
     // Remove color customization swatches
     this.destroyColourPanel();
+
+    // Remove the scores list (local scores or global leaderboard + Refresh button)
+    this.clearLeaderboard();
 
     // Remove game-over overlay, if a new round is starting from it
     this.clearGameOverOverlay();
