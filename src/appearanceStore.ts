@@ -59,3 +59,64 @@ export function createAppearanceStore(
     save,
   };
 }
+
+export interface AccountAppearanceStore {
+  /** The account's saved colours; parts that are missing or invalid, or all of them on any failure, are random palette colours. Never rejects. */
+  load(): Promise<Appearance>;
+  /** Sends the colours with `PUT /appearance` once no further save has come in for the debounce delay. */
+  save(colours: Appearance): void;
+}
+
+export function createAccountAppearanceStore(options: {
+  fetch: typeof fetch;
+  token: string;
+  random?: () => number;
+  debounceMs?: number;
+  url?: string;
+}): AccountAppearanceStore {
+  const { token, debounceMs = 500, url = '/api/appearance' } = options;
+  const random = options.random ?? Math.random;
+  const randomColor = () => PALETTE[Math.min(PALETTE.length - 1, Math.floor(random() * PALETTE.length))];
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  const randomColours = (): Appearance => ({ head: randomColor(), body: randomColor(), eyes: randomColor() });
+
+  let pending: ReturnType<typeof setTimeout> | undefined;
+
+  async function put(colours: Appearance): Promise<void> {
+    try {
+      const response = await options.fetch(url, { method: 'PUT', headers, body: JSON.stringify(colours) });
+      if (!response.ok) console.warn(`[appearanceStore] Saving appearance failed: ${response.status}`);
+    } catch (error) {
+      console.warn('[appearanceStore] Saving appearance failed:', error);
+    }
+  }
+
+  return {
+    async load() {
+      try {
+        const response = await options.fetch(url, { headers });
+        if (response.status === 404) return randomColours();
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const stored = await response.json();
+        const source = stored && typeof stored === 'object' ? stored : {};
+        const colours = {} as Appearance;
+        for (const part of PARTS) {
+          const value = source[part];
+          colours[part] = typeof value === 'string' && HEX.test(value) ? value : randomColor();
+        }
+        return colours;
+      } catch (error) {
+        console.warn('[appearanceStore] Loading appearance failed, using random colours:', error);
+        return randomColours();
+      }
+    },
+    save(colours) {
+      const snapshot = { ...colours };
+      clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = undefined;
+        void put(snapshot);
+      }, debounceMs);
+    },
+  };
+}
