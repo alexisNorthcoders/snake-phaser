@@ -63,6 +63,14 @@ export interface AmbientSnakeOptions {
     blocked?: (cell: Cell) => boolean
     /** Chance per step of sliding into the other lane instead of going straight. */
     laneSwitchChance?: number
+    /** Fruit currently on the board; the snake is lightly drawn towards the nearest one on its side of the screen. */
+    fruit?: () => readonly Cell[]
+    /** Called when the head lands on a fruit cell; the snake grows by one, up to maxLength. */
+    onEat?: (cell: Cell) => void
+    /** Length at which eating stops growing the snake. */
+    maxLength?: number
+    /** Chance per step of preferring a move that closes on the target fruit. */
+    seekChance?: number
 }
 
 export interface AmbientSnake {
@@ -81,6 +89,10 @@ export function createAmbientSnake({
     length = 8,
     blocked = () => false,
     laneSwitchChance = 0.08,
+    fruit = () => [],
+    onEat = () => {},
+    maxLength = 9,
+    seekChance = 0.3,
 }: AmbientSnakeOptions): AmbientSnake {
     const free = (cell: Cell, body: readonly Cell[]) =>
         inBand(grid, cell) && !blocked(cell) && !body.some((c) => c.x === cell.x && c.y === cell.y)
@@ -97,7 +109,30 @@ export function createAmbientSnake({
     let cells: Cell[] = start
     let heading = DIRECTIONS[0]
 
+    const sameCell = (a: Cell, b: Cell) => a.x === b.x && a.y === b.y
+    const distance = (a: Cell, b: Cell) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+
+    /** Moves the head to `head` with `rest` following; grows if it lands on fruit and there is room. */
+    const advance = (head: Cell, rest: Cell[]) => {
+        const eaten = fruit().some((f) => sameCell(f, head))
+        // Dropping the vacated tail is the normal move; keeping it is growth.
+        cells = eaten && rest.length < maxLength ? [head, ...rest] : [head, ...rest.slice(0, -1)]
+        if (eaten) onEat(head)
+    }
+
     const pick = (options: Cell[]) => options[Math.floor(random() * options.length)]
+
+    /** The nearest fruit sharing a screen side (top, bottom, left or right band) with the cell. */
+    const nearestFruitOnSide = (from: Cell): Cell | undefined => {
+        const sides = (c: Cell) => [c.y < BAND_LANES, c.y >= grid.rows - BAND_LANES, c.x < BAND_LANES, c.x >= grid.cols - BAND_LANES]
+        const mine = sides(from)
+        let best: Cell | undefined
+        for (const f of fruit()) {
+            if (!sides(f).some((on, i) => on && mine[i])) continue
+            if (!best || distance(from, f) < distance(from, best)) best = f
+        }
+        return best
+    }
 
     return {
         get cells() {
@@ -113,7 +148,16 @@ export function createAmbientSnake({
             const forwardFree = free(at(heading), body)
 
             let next: Cell | undefined
-            if (forwardFree && freeSideways.length > 0 && random() < laneSwitchChance) {
+            const target = nearestFruitOnSide(head)
+            const closing = target && random() < seekChance
+                ? DIRECTIONS.filter((d) => (d.x !== -heading.x || d.y !== -heading.y)
+                    && free(at(d), body) && distance(at(d), target) < distance(head, target))
+                : []
+            if (closing.length > 0) {
+                const d = pick(closing)
+                heading = d
+                next = at(d)
+            } else if (forwardFree && freeSideways.length > 0 && random() < laneSwitchChance) {
                 next = at(pick(freeSideways))
             } else if (forwardFree) {
                 next = at(heading)
@@ -123,7 +167,7 @@ export function createAmbientSnake({
                 next = at(turn)
             }
             if (next) {
-                cells = [next, ...cells.slice(0, -1)]
+                advance(next, cells)
                 return
             }
 
@@ -139,7 +183,7 @@ export function createAmbientSnake({
             if (options.length === 0) return
             const dir = options[0] === tailDir ? tailDir : pick(options)
             heading = dir
-            cells = [rAt(dir), ...reversed.slice(0, -1)]
+            advance(rAt(dir), reversed)
         },
     }
 }
