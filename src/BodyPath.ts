@@ -140,3 +140,16 @@ function lerp(a: Point, b: Point, f: number): Point {
 function clamp(value: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, value))
 }
+
+/**
+ * Where a round cap goes on the tail end of `path`: the last point, and the
+ * angle (radians) the tail points away from the body, taken from the last two
+ * distinct points. Null when the path has no direction yet.
+ */
+export function tailCap(path: Point[]): { centre: Point; angle: number } | null {
+    if (path.length === 0) return null
+    const centre = path[path.length - 1]
+    const before = [...path].reverse().find(({ x, y }) => x !== centre.x || y !== centre.y)
+    if (!before) return null
+    return { centre, angle: Math.atan2(centre.y - before.y, centre.x - before.x) }
+}
