@@ -1,4 +1,5 @@
 import { getRandomColor } from './utils'
+import { BodyTween } from './BodyTween'
 
 interface SnakeColorSet {
     body?: string
@@ -10,6 +11,10 @@ export interface GridPosition {
     x: number
     y: number
 }
+
+// The server's gameConfig: 8 ticks a second on a 20-cell board.
+const TICK_MS = 1000 / 8
+const BOARD_CELLS = 20
 
 export class Snake {
     private scene: Phaser.Scene
@@ -24,10 +29,9 @@ export class Snake {
     public speed: GridPosition = { x: 1, y: 0 }
 
     public colors: Required<SnakeColorSet>
-    public tail: GridPosition[] = []
 
-    private gridX: number
-    private gridY: number
+    // Head first, then the tail in body order.
+    private body = new BodyTween(TICK_MS, BOARD_CELLS)
     private size: number
 
     constructor(
@@ -41,10 +45,9 @@ export class Snake {
         this.scene = scene
         this.type = type
         this.size = size
-        this.gridX = x
-        this.gridY = y
+        this.body.retarget([{ x, y }], performance.now())
 
-        this.gridSize = Math.floor(Math.min(scene.scale.width, scene.scale.height) / 20);
+        this.gridSize = Math.floor(Math.min(scene.scale.width, scene.scale.height) / BOARD_CELLS);
 
         this.colors = {
             body: colors.body || getRandomColor(),
@@ -60,16 +63,22 @@ export class Snake {
         this.speed = { x, y }
     }
 
-    position(pos: GridPosition): void {
-        this.gridX = pos.x
-        this.gridY = pos.y
+    /** Slides the snake onto the cells from the latest patch, tail given newest first. */
+    moveTo(head: GridPosition, tail: GridPosition[]): void {
+        this.body.retarget([head, ...tail], performance.now())
+    }
+
+    /** Stops sliding and draws the snake on its latest cells from now on. */
+    snap(): void {
+        this.body.snap()
     }
 
     draw(yOffset: number): void {
-        const { graphics, gridSize, tail, colors, transparent } = this
+        const { graphics, gridSize, colors, transparent } = this
 
-        const headX = this.gridX * gridSize
-        const headY = yOffset + this.gridY * gridSize
+        const [head, ...tail] = this.body.positionsAt(performance.now())
+        const headX = head.x * gridSize
+        const headY = yOffset + head.y * gridSize
 
         graphics.clear()
 
@@ -113,6 +122,7 @@ export class Snake {
 
     async stop(playerId: string, score: number, isAnonymous: boolean): Promise<void> {
         this.isDead = true
+        this.snap()
         this.colors.head = 'black'
         this.colors.eyes = 'gray'
         this.colors.body = 'rgb(139, 0, 0)'

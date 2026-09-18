@@ -142,9 +142,15 @@ class SocketManager {
               }
 
               if (!currentSnake.isDead) {
-                currentSnake.tail = tailCells(player.snake);
                 currentSnake.food = player.snake.score;
-                currentSnake.position({ x: player.snake.x, y: player.snake.y });
+                currentSnake.moveTo({ x: player.snake.x, y: player.snake.y }, tailCells(player.snake));
+
+                // The patch that ends the round (it lands after the gameOver
+                // message): show where the survivor finished rather than
+                // sliding on under the game-over screen.
+                if (!state.hasGameStarted) {
+                  currentSnake.snap();
+                }
 
                 if (player.snake.isDead) {
                   currentSnake.stop(player.id, player.snake.score, false);

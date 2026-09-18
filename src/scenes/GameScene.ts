@@ -515,10 +515,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.food.forEach((f) => f.draw())
 
+    // Dead snakes too: they are snapped onto their last cells, and skipping
+    // them would leave the frame from mid-slide on screen.
     for (const snake of this.snakes.values()) {
-      if (!snake.isDead) {
-        snake.draw(40);
-      }
+      snake.draw(40);
     }
   }
 
