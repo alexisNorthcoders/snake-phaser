@@ -4,6 +4,8 @@ import { migrateAnonymousScores } from './scoreMigrationHelper';
 export interface AuthModalConfig {
   playerName: string;
   playerScore: number;
+  /** Skip the "save this score" prompt and open straight on this form. Back then just closes. */
+  initialForm?: 'login' | 'register';
   onAuthSuccess: () => void;
   onDismiss: () => void;
 }
@@ -36,6 +38,11 @@ class AuthModalManager {
     this.isRegistering = false;
     this.currentConfig = config;
 
+    if (config.initialForm) {
+      this.isRegistering = config.initialForm === 'register';
+      this.showAuthForm(config);
+      return;
+    }
     this.createInitialPrompt(config);
   }
 
@@ -221,7 +228,11 @@ class AuthModalManager {
       .on('pointerdown', () => {
         this.isRegistering = false;
         this.close();
-        this.open(scene, cfg);
+        if (cfg.initialForm) {
+          onDismiss();
+        } else {
+          this.open(scene, cfg);
+        }
       });
     this.state.objects.push(backButton);
 
