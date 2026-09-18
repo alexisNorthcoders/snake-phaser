@@ -291,7 +291,14 @@ class AuthModalManager {
       }));
 
       // Migrate anonymous scores if any exist
-      await this.migrateAnonymousScores(token, userId);
+      const migrationMessage = await this.migrateAnonymousScores(token, userId);
+
+      // Show success message and wait before closing
+      this.errorText.setStyle({ color: '#00ff00' });
+      this.errorText.setText(migrationMessage || 'Login successful!');
+
+      // Wait 2 seconds for user to see confirmation, then close
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       this.close();
       config.onAuthSuccess();
@@ -300,17 +307,17 @@ class AuthModalManager {
     }
   }
 
-  private async migrateAnonymousScores(token: string, userId: string) {
+  private async migrateAnonymousScores(token: string, userId: string): Promise<string> {
     const clientId = ClientIdManager.getClientId();
     if (!clientId) {
       console.log('[authModalManager] No client ID found, skipping score migration');
-      return;
+      return 'Login successful!';
     }
 
     const anonScores = LocalScoresManager.getClientScores();
     if (anonScores.length === 0) {
       console.log('[authModalManager] No anonymous scores to migrate');
-      return;
+      return 'Login successful!';
     }
 
     try {
@@ -332,17 +339,20 @@ class AuthModalManager {
 
         if (migratedCount > 0) {
           console.log(`[authModalManager] ${migratedCount} score(s) migrated successfully`);
-          if (this.errorText) {
-            this.errorText.setText('Your scores have been saved!');
-          }
+          return `Your ${migratedCount} score(s) have been saved!`;
         } else {
           console.log('[authModalManager] No scores found to migrate');
+          return 'Login successful!';
         }
       } else {
         console.error('[authModalManager] Score migration failed:', response.statusText);
+        // Keep localStorage intact on error
+        return `Login successful, but scores couldn't be saved. Try again later.`;
       }
     } catch (error) {
       console.error('[authModalManager] Score migration error:', error);
+      // Keep localStorage intact on error
+      return `Login successful, but scores couldn't be saved. Try again later.`;
     }
   }
 
