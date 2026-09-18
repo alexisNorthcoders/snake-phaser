@@ -4,7 +4,7 @@ import { Food } from '../Food';
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
 import { drawSnake } from '../SnakeDrawing';
-import { isGuest } from '../userData';
+import { isGuest, sessionName } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
 import { createAccountAppearanceStore, createAppearanceStore, PALETTE, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
@@ -291,7 +291,7 @@ export class GameScene extends Phaser.Scene {
 
     this.guest = isGuest(userData);
     // Guests play under the name they picked last time; logged-in players keep their account username.
-    this.name = this.guest ? nameStore.load() : userData.username;
+    this.name = sessionName(userData, nameStore);
     this.playerId = String(userData.userId);
 
     this.playerNameText = this.add.text(400, 10, `Player: ${this.name}`, {
@@ -608,7 +608,7 @@ export class GameScene extends Phaser.Scene {
         onAuthSuccess: () => {
           // Refresh user data from localStorage after auth
           const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-          this.name = userData.username;
+          this.name = sessionName(userData, nameStore);
           this.guest = isGuest(userData);
           this.playerNameText.setText(`Player: ${this.name}`);
           this.playerId = String(userData.userId);
