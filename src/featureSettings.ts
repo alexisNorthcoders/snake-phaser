@@ -5,6 +5,8 @@ export interface FeatureSettings {
     snakeBodyWidth: number
     /** Only used by 'arcs': the head follows the curve instead of sliding straight. */
     snakeHeadFollowsArc: boolean
+    /** Shows a live FPS readout on a second HUD row. */
+    showFps: boolean
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -18,9 +20,9 @@ const BODY_STYLES: SnakeBodyStyle[] = ['blocks', 'joints', 'arcs']
 const MIN_WIDTH = 0.5
 const MAX_WIDTH = 1
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -48,11 +50,18 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return DEFAULTS.snakeHeadFollowsArc
     }
 
+    const fpsFlag = (value: unknown): boolean => {
+        if (typeof value === 'boolean') return value
+        warn(`showFps must be a boolean, got ${JSON.stringify(value)}; using ${DEFAULTS.showFps}`)
+        return DEFAULTS.showFps
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
         snakeBodyWidth: 'snakeBodyWidth' in stored ? bodyWidth(stored.snakeBodyWidth) : DEFAULTS.snakeBodyWidth,
         snakeHeadFollowsArc: 'snakeHeadFollowsArc' in stored ? headFollowsArc(stored.snakeHeadFollowsArc) : DEFAULTS.snakeHeadFollowsArc,
+        showFps: 'showFps' in stored ? fpsFlag(stored.showFps) : DEFAULTS.showFps,
     }
     const save = () => {
         try {
@@ -87,12 +96,18 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.snakeHeadFollowsArc = headFollowsArc(follows)
             save()
         },
+        get showFps() { return values.showFps },
+        set showFps(show) {
+            values.showFps = fpsFlag(show)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
                 `  feature.snakeBody = '${values.snakeBody}'    // ${BODY_STYLES.map((style) => `'${style}'`).join(' | ')}`,
                 `  feature.snakeBodyWidth = ${values.snakeBodyWidth}    // ${MIN_WIDTH}–${MAX_WIDTH} cells, ignored by 'blocks'`,
                 `  feature.snakeHeadFollowsArc = ${values.snakeHeadFollowsArc}    // true | false, only used by 'arcs'`,
+                `  feature.showFps = ${values.showFps}    // true | false, live FPS readout under Score`,
             ].join('\n'))
         },
     }
