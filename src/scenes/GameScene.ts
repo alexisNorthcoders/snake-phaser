@@ -285,10 +285,8 @@ export class GameScene extends Phaser.Scene {
       this.createColourPanel();
       this.createNameField();
     } else {
-      // The panel exists straight away but stays hidden until the account's colours (or the random fallback) arrive,
-      // so the preview never flickers from random to saved. Hidden zones take no input, so picks can't race the load.
-      this.createColourPanel();
-      this.colourPanel?.setVisible(false);
+      // The panel is only built once the account's colours (or the random fallback) have arrived, so nothing
+      // flashes or can be picked before the load, and the selection starts from the loaded colours.
       this.accountAppearance = createAccountAppearanceStore({
         fetch: (input, init) => fetch(input, init),
         token: userData.token,
@@ -296,10 +294,9 @@ export class GameScene extends Phaser.Scene {
       });
       this.accountAppearance.load().then((colours) => {
         if (!this.sys.isActive()) return;
-        // Mutate in place: snakeColors is shared with the selection, and must be updated even if the panel is gone.
+        // Colours are applied even if the lobby was already left, so the game still uses them.
         Object.assign(this.snakeColors, colours);
-        this.colourPanel?.setVisible(true);
-        this.colourPanel?.refresh();
+        if (this.welcomeText?.active && !this.colourPanel) this.createColourPanel();
         this.sendColorUpdate();
       });
     }
