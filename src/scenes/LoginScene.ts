@@ -224,8 +224,8 @@ export class LoginScene extends Phaser.Scene {
                         username: data.user.username,
                         userId: data.userId,
                         expiresIn: data.expiresIn,
-                        // Keep the guest marker: the server only knows the name
-                        isGuest: isGuest(JSON.parse(localStorage.getItem('userData') || '{}')) || undefined,
+                        // The server only knows the name, so carry the stored session's guest status over
+                        isGuest: isGuest(JSON.parse(localStorage.getItem('userData') || '{}')),
                     };
 
                     localStorage.setItem('userData', JSON.stringify(userData));

@@ -54,7 +54,7 @@ export class GameScene extends Phaser.Scene {
     eyes: '#FFFFFF'
   };
   public name: string = '';
-  private isGuest: boolean = false;
+  private guest: boolean = false;
   private startButton?: Phaser.GameObjects.Text;
   private colorSwatches: Phaser.GameObjects.GameObject[] = [];
   private colorPicker?: { close: () => void };
@@ -247,7 +247,7 @@ export class GameScene extends Phaser.Scene {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
     this.name = userData.username;
-    this.isGuest = isGuest(userData);
+    this.guest = isGuest(userData);
     this.playerId = String(userData.userId);
 
     this.playerNameText = this.add.text(400, 10, `Player: ${this.name}`, {
@@ -344,7 +344,7 @@ export class GameScene extends Phaser.Scene {
       color: '#fff',
     }).setOrigin(0.5);
 
-    if (this.isGuest) {
+    if (this.guest) {
       this.snakeColors = appearanceStore.load();
       this.createColorSwatches();
     } else {
@@ -435,7 +435,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private async displayLeaderboard(): Promise<void> {
-    if (this.isGuest) {
+    if (this.guest) {
       this.displayTopLocalScores();
       return;
     }
@@ -539,7 +539,7 @@ export class GameScene extends Phaser.Scene {
       LocalScoresManager.saveScore(playerRanking.score);
 
       // For anonymous players, also try to submit score to server
-      if (this.isGuest) {
+      if (this.guest) {
         const clientId = ClientIdManager.getOrCreateClientId();
         const result = await postAnonymousScore(clientId, playerRanking.score);
         if (!result.success) {
@@ -552,7 +552,7 @@ export class GameScene extends Phaser.Scene {
     const score = playerRanking?.score ?? 0;
 
     // Show auth modal for anonymous players
-    if (this.isGuest) {
+    if (this.guest) {
       const authConfig: AuthModalConfig = {
         playerName: this.name,
         playerScore: score,
@@ -560,7 +560,7 @@ export class GameScene extends Phaser.Scene {
           // Refresh user data from localStorage after auth
           const userData = JSON.parse(localStorage.getItem('userData') || '{}');
           this.name = userData.username;
-          this.isGuest = isGuest(userData);
+          this.guest = isGuest(userData);
           this.playerNameText.setText(`Player: ${this.name}`);
           this.playerId = String(userData.userId);
           // Show normal game over screen
