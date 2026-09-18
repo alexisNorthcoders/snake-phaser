@@ -79,11 +79,13 @@ class AuthModalManager {
       .setDepth(30);
     this.state.objects.push(playerNameText);
 
-    const guestButton = scene.add.text(PANEL_CENTER_X - 90, 400, 'Play as Guest', {
+    const guestButton = scene.add.text(PANEL_CENTER_X, 435, 'Play as Guest', {
       fontSize: '18px',
       backgroundColor: '#555',
       color: '#ffffff',
       padding: { x: 10, y: 5 },
+      fixedWidth: 260,
+      align: 'center',
     })
       .setOrigin(0.5)
       .setDepth(30)
@@ -96,11 +98,13 @@ class AuthModalManager {
       });
     this.state.objects.push(guestButton);
 
-    const authButton = scene.add.text(PANEL_CENTER_X + 90, 400, 'Create Account / Log In', {
-      fontSize: '16px',
+    const authButton = scene.add.text(PANEL_CENTER_X, 380, 'Create Account / Log In', {
+      fontSize: '18px',
       backgroundColor: '#00aa00',
       color: '#ffffff',
-      padding: { x: 8, y: 5 },
+      padding: { x: 10, y: 5 },
+      fixedWidth: 260,
+      align: 'center',
     })
       .setOrigin(0.5)
       .setDepth(30)
