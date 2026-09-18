@@ -1,7 +1,8 @@
 import { getRandomColor } from './utils'
 import { BodyTween } from './BodyTween'
 import { arcBodyPath } from './BodyPath'
-import { unwrapChain, wrapPieces, wrapCell } from './BodyWrap'
+import { unwrapChain, wrapCell } from './BodyWrap'
+import { drawSnake, type SnakeDrawing } from './SnakeDrawing'
 import { feature } from './feature'
 
 interface SnakeColorSet {
@@ -18,7 +19,6 @@ export interface GridPosition {
 // The server's gameConfig: 8 ticks a second on a 20-cell board.
 const TICK_MS = 1000 / 8
 const BOARD_CELLS = 20
-const DEAD_ALPHA = 0.35
 
 export class Snake {
     private scene: Phaser.Scene
@@ -84,7 +84,7 @@ export class Snake {
     }
 
     draw(yOffset: number): void {
-        const { graphics, gridSize, colors } = this
+        const { graphics, gridSize } = this
 
         const now = performance.now()
         const segments = this.body.positionsAt(now)
@@ -95,135 +95,27 @@ export class Snake {
         this.bodyMask.fillStyle(0xffffff, 1)
         this.bodyMask.fillRect(0, yOffset, BOARD_CELLS * gridSize, BOARD_CELLS * gridSize)
 
-        let headCell: GridPosition = segments[0]
+        const drawing: SnakeDrawing = {
+            cells: segments,
+            colors: this.colors,
+            cellSize: gridSize,
+            origin: { x: 0, y: yOffset },
+            bodyStyle: feature.snakeBody === 'blocks' ? 'blocks' : 'joints',
+            bodyWidth: feature.snakeBodyWidth,
+            wrapCells: BOARD_CELLS,
+            isDead: this.isDead,
+            bodyAlpha: this.transparent,
+        }
 
-        if (feature.snakeBody === 'blocks') {
-            this.drawBlocks(segments.slice(1), yOffset)
-        } else if (feature.snakeBody === 'arcs') {
+        if (feature.snakeBody === 'arcs') {
             const chain = unwrapChain([...this.body.targets, this.body.tailPrevious], BOARD_CELLS)
             const path = arcBodyPath(chain.slice(0, -1), chain[chain.length - 1], this.body.progressAt(now))
-            this.drawPath(path, yOffset)
-            if (feature.snakeHeadFollowsArc && path.length > 0) headCell = wrapCell(path[0], BOARD_CELLS)
-        } else {
-            this.drawJoints(segments, yOffset)
+            drawing.bodyStyle = 'path'
+            drawing.path = path
+            if (feature.snakeHeadFollowsArc && path.length > 0) drawing.headCell = wrapCell(path[0], BOARD_CELLS)
         }
 
-        const headX = headCell.x * gridSize
-        const headY = yOffset + headCell.y * gridSize
-
-        // Draw head
-        const headColor = Phaser.Display.Color.HexStringToColor(colors.head).color
-        const headAlpha = this.isDead ? DEAD_ALPHA : 1
-        graphics.fillStyle(headColor, headAlpha)
-        graphics.fillCircle(headX + gridSize / 2, headY + gridSize / 2, gridSize / 2)
-        graphics.lineStyle(2, 0x000000, headAlpha)
-        graphics.strokeCircle(headX + gridSize / 2, headY + gridSize / 2, gridSize / 2)
-
-        // Draw eyes
-        const eyeSize = gridSize / 5
-        const eyeX1 = headX + gridSize / 5
-        const eyeX2 = headX + (3 * gridSize) / 5
-        const eyeY = headY
-
-        const eyesColor = Phaser.Display.Color.HexStringToColor(colors.eyes).color
-
-        if (this.isDead) {
-            // Full opacity: a black X under an eye-coloured one stays readable on any colour.
-            this.drawXEye(eyeX1, eyeY, eyeSize, eyesColor)
-            this.drawXEye(eyeX2, eyeY, eyeSize, eyesColor)
-            return
-        }
-
-        graphics.fillStyle(eyesColor, 1)
-        graphics.fillRect(eyeX1, eyeY, eyeSize, eyeSize)
-        graphics.fillRect(eyeX2, eyeY, eyeSize, eyeSize)
-        graphics.lineStyle(1, 0xffff00, 1)
-        graphics.strokeRect(eyeX1, eyeY, eyeSize, eyeSize)
-        graphics.strokeRect(eyeX2, eyeY, eyeSize, eyeSize)
-    }
-
-    private drawXEye(x: number, y: number, size: number, color: number): void {
-        const { graphics } = this
-        const cross = (thickness: number, lineColor: number) => {
-            graphics.lineStyle(thickness, lineColor, 1)
-            graphics.lineBetween(x, y, x + size, y + size)
-            graphics.lineBetween(x + size, y, x, y + size)
-        }
-        cross(5, 0x000000)
-        cross(3, color)
-    }
-
-    /** Opacity of the body: dead snakes are see-through, live ones use their own transparency. */
-    private get bodyAlpha(): number {
-        return this.isDead ? DEAD_ALPHA : this.transparent
-    }
-
-    /** One outlined square per tail cell. */
-    private drawBlocks(tail: GridPosition[], yOffset: number): void {
-        const { graphics, gridSize, colors } = this
-        const transparent = this.bodyAlpha
-        const bodyColor = Phaser.Display.Color.HexStringToColor(colors.body).color
-
-        tail.forEach((segment) => {
-            const x = segment.x * gridSize
-            const y = yOffset + segment.y * gridSize
-
-            graphics.fillStyle(bodyColor, transparent)
-            graphics.fillRect(x, y, gridSize, gridSize)
-            graphics.lineStyle(2, 0x000000, transparent)
-            graphics.strokeRect(x, y, gridSize, gridSize)
-        })
-    }
-
-    /**
-     * One continuous body through the segment centres, head included: a thick
-     * line with a circle on every joint to round it.
-     */
-    private drawJoints(segments: GridPosition[], yOffset: number): void {
-        const pieces = wrapPieces(unwrapChain(segments, BOARD_CELLS), BOARD_CELLS)
-        for (const piece of pieces) {
-            this.strokeDoubleLine(piece.map(({ x, y }) => this.toPixels(x, y, yOffset)), { roundJoints: true })
-        }
-    }
-
-    /**
-     * The 'arcs' body: `path` is already a smooth poly-line (corners rounded
-     * into quarter-arcs), so it needs no per-point circles — those would blob
-     * a curve that's already round.
-     */
-    private drawPath(path: GridPosition[], yOffset: number): void {
-        for (const piece of wrapPieces(path, BOARD_CELLS)) {
-            this.strokeDoubleLine(piece.map(({ x, y }) => this.toPixels(x, y, yOffset)), { roundJoints: false })
-        }
-    }
-
-    private toPixels(x: number, y: number, yOffset: number): { x: number; y: number } {
-        const { gridSize } = this
-        return { x: (x + 0.5) * gridSize, y: yOffset + (y + 0.5) * gridSize }
-    }
-
-    /**
-     * A black pass 2px wider than `snakeBodyWidth` under a body-coloured pass
-     * 2px narrower, leaving a single 2px silhouette. `roundJoints` fills a
-     * circle at every point, for a polyline whose corners are square.
-     */
-    private strokeDoubleLine(points: { x: number; y: number }[], { roundJoints }: { roundJoints: boolean }): void {
-        const { bodyGraphics: graphics, gridSize, colors } = this
-        const transparent = this.bodyAlpha
-        const width = feature.snakeBodyWidth * gridSize
-        if (points.length < 2) return
-
-        const pass = (color: number, thickness: number) => {
-            graphics.lineStyle(thickness, color, transparent)
-            graphics.strokePoints(points)
-            if (roundJoints) {
-                graphics.fillStyle(color, transparent)
-                points.forEach(({ x, y }) => graphics.fillCircle(x, y, thickness / 2))
-            }
-        }
-
-        pass(0x000000, width + 2)
-        pass(Phaser.Display.Color.HexStringToColor(colors.body).color, width - 2)
+        drawSnake({ graphics, bodyGraphics: this.bodyGraphics }, drawing)
     }
 
     destroy(): void {
