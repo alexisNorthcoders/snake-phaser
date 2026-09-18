@@ -140,6 +140,11 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setScrollFactor(0);
 
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+
+    this.name = userData.username;
+    this.playerId = String(userData.userId);
+
     this.playerNameText = this.add.text(400, 10, `Player: ${this.name}`, {
       fontSize: '20px',
       color: '#ffffff',
@@ -228,11 +233,6 @@ export class GameScene extends Phaser.Scene {
       console.log("[GameScene] Start button clicked");
       socketManager.send({ event: 'startGame' });
     });
-
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-
-    this.name = userData.username;
-    this.playerId = String(userData.userId);
 
     this.welcomeText = this.add.text(400, 300, `Welcome ${this.name}!`, {
       fontSize: '32px',
@@ -433,6 +433,7 @@ export class GameScene extends Phaser.Scene {
           // Refresh user data from localStorage after auth
           const userData = JSON.parse(localStorage.getItem('userData') || '{}');
           this.name = userData.username;
+          this.playerNameText.setText(`Player: ${this.name}`);
           this.playerId = String(userData.userId);
           // Show normal game over screen
           this.displayGameOverScreen(payload);
