@@ -1,5 +1,6 @@
 import { getRandomColor } from './utils'
 import { BodyTween } from './BodyTween'
+import { feature } from './feature'
 
 interface SnakeColorSet {
     body?: string
@@ -71,25 +72,18 @@ export class Snake {
     }
 
     draw(yOffset: number): void {
-        const { graphics, gridSize, colors, transparent } = this
+        const { graphics, gridSize, colors } = this
 
-        const [head, ...tail] = this.body.positionsAt(performance.now())
+        const segments = this.body.positionsAt(performance.now())
+        const [head] = segments
         const headX = head.x * gridSize
         const headY = yOffset + head.y * gridSize
 
         graphics.clear()
 
-        // Draw tail
-        tail.forEach((segment) => {
-            const x = segment.x * gridSize
-            const y = yOffset + segment.y * gridSize
-
-            const bodyColor = Phaser.Display.Color.HexStringToColor(colors.body).color
-            graphics.fillStyle(bodyColor, transparent)
-            graphics.fillRect(x, y, gridSize, gridSize)
-            graphics.lineStyle(2, 0x000000, transparent)
-            graphics.strokeRect(x, y, gridSize, gridSize)
-        })
+        // Until the 'arcs' style exists it is drawn as 'joints'.
+        if (feature.snakeBody === 'blocks') this.drawBlocks(segments.slice(1), yOffset)
+        else this.drawJoints(segments, yOffset)
 
         // Draw head
         const headColor = Phaser.Display.Color.HexStringToColor(colors.head).color
@@ -111,6 +105,46 @@ export class Snake {
         graphics.lineStyle(1, 0xffff00, 1)
         graphics.strokeRect(eyeX1, eyeY, eyeSize, eyeSize)
         graphics.strokeRect(eyeX2, eyeY, eyeSize, eyeSize)
+    }
+
+    /** One outlined square per tail cell. */
+    private drawBlocks(tail: GridPosition[], yOffset: number): void {
+        const { graphics, gridSize, colors, transparent } = this
+        const bodyColor = Phaser.Display.Color.HexStringToColor(colors.body).color
+
+        tail.forEach((segment) => {
+            const x = segment.x * gridSize
+            const y = yOffset + segment.y * gridSize
+
+            graphics.fillStyle(bodyColor, transparent)
+            graphics.fillRect(x, y, gridSize, gridSize)
+            graphics.lineStyle(2, 0x000000, transparent)
+            graphics.strokeRect(x, y, gridSize, gridSize)
+        })
+    }
+
+    /**
+     * One continuous body through the segment centres, head included: a thick
+     * line with a circle on every joint to round it. A black pass 2px wider
+     * under a body-coloured pass 2px narrower leaves a single 2px silhouette.
+     */
+    private drawJoints(segments: GridPosition[], yOffset: number): void {
+        const { graphics, gridSize, colors, transparent } = this
+        const width = feature.snakeBodyWidth * gridSize
+        const centres = segments.map(({ x, y }) => ({
+            x: (x + 0.5) * gridSize,
+            y: yOffset + (y + 0.5) * gridSize,
+        }))
+
+        const pass = (color: number, thickness: number) => {
+            graphics.lineStyle(thickness, color, transparent)
+            if (centres.length > 1) graphics.strokePoints(centres)
+            graphics.fillStyle(color, transparent)
+            centres.forEach(({ x, y }) => graphics.fillCircle(x, y, thickness / 2))
+        }
+
+        pass(0x000000, width + 2)
+        pass(Phaser.Display.Color.HexStringToColor(colors.body).color, width - 2)
     }
 
     destroy(): void {
