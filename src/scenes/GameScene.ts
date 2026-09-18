@@ -83,6 +83,10 @@ export class GameScene extends Phaser.Scene {
     (this.accountAppearance ?? appearanceStore).save(this.snakeColors);
   }
 
+  private setSwatchesVisible(visible: boolean): void {
+    this.colorSwatches.forEach((obj) => (obj as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Visible).setVisible(visible));
+  }
+
   private createColorSwatches(): void {
     const CELL = 36;
     const origin = { x: 400 - CELL * 1.5, y: 338 };
@@ -341,7 +345,10 @@ export class GameScene extends Phaser.Scene {
       this.snakeColors = appearanceStore.load();
       this.createColorSwatches();
     } else {
-      // The preview stays hidden until the account's colours arrive, so it never flickers from random to saved.
+      // The swatches exist straight away but stay hidden until the account's colours (or the random fallback) arrive,
+      // so the preview never flickers from random to saved. Hidden zones take no input, so picks can't race the load.
+      this.createColorSwatches();
+      this.setSwatchesVisible(false);
       this.accountAppearance = createAccountAppearanceStore({
         fetch: (input, init) => fetch(input, init),
         token: userData.token,
@@ -349,7 +356,8 @@ export class GameScene extends Phaser.Scene {
       this.accountAppearance.load().then((colours) => {
         if (!this.sys.isActive()) return;
         this.snakeColors = colours;
-        this.createColorSwatches();
+        this.setSwatchesVisible(true);
+        this.redrawPreview?.();
         this.sendColorUpdate();
       });
     }
