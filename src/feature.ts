@@ -19,7 +19,7 @@ if (import.meta.env.DEV) {
 }
 
 // Merely touching `window.localStorage` throws when site data is blocked.
-function localStorageOrNothing(): Storage | undefined {
+export function localStorageOrNothing(): Storage | undefined {
     try {
         return window.localStorage
     } catch {

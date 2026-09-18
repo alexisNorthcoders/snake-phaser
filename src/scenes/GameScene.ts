@@ -3,6 +3,9 @@ import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } f
 import { Food } from '../Food';
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
+import { drawSnake } from '../SnakeDrawing';
+import { feature, localStorageOrNothing } from '../feature';
+import { createAppearanceStore, PALETTE } from '../appearanceStore';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 
 interface SnakeColors {
@@ -22,10 +25,9 @@ interface GameOverPayload {
   rankings: RankingEntry[];
 }
 
-function getRandomColor(): string {
-  const value = Math.floor(Math.random() * 0xffffff);
-  return `#${value.toString(16).padStart(6, '0')}`;
-}
+type PickerPart = keyof SnakeColors;
+
+const appearanceStore = createAppearanceStore(localStorageOrNothing());
 
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
@@ -53,6 +55,8 @@ export class GameScene extends Phaser.Scene {
   public name: string = '';
   private startButton?: Phaser.GameObjects.Text;
   private colorSwatches: Phaser.GameObjects.GameObject[] = [];
+  private colorPicker?: { close: () => void };
+  private redrawPreview?: () => void;
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
   private leaderboardObjects: Phaser.GameObjects.GameObject[] = [];
@@ -74,35 +78,123 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createColorSwatches(): void {
-    const label = this.add.text(400, 335, 'Click to randomize colors', {
-      fontSize: '16px',
-      color: '#cccccc',
-    }).setOrigin(0.5);
+    const CELL = 36;
+    const origin = { x: 400 - CELL * 1.5, y: 338 };
+    const bodyGraphics = this.add.graphics();
+    const graphics = this.add.graphics();
+    const highlight = this.add.graphics();
 
-    const head = this.add.circle(350, 365, 15, Phaser.Display.Color.HexStringToColor(this.snakeColors.head).color)
-      .setInteractive({ useHandCursor: true });
-    const body = this.add.rectangle(400, 365, 30, 30, Phaser.Display.Color.HexStringToColor(this.snakeColors.body).color)
-      .setInteractive({ useHandCursor: true });
-    const eyes = this.add.rectangle(450, 365, 20, 20, Phaser.Display.Color.HexStringToColor(this.snakeColors.eyes).color)
-      .setInteractive({ useHandCursor: true });
+    const draw = () => {
+      bodyGraphics.clear();
+      graphics.clear();
+      drawSnake({ graphics, bodyGraphics }, {
+        // Facing right: head first, then the body cell, then the tail cell.
+        cells: [{ x: 2, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 }],
+        colors: this.snakeColors,
+        cellSize: CELL,
+        origin,
+        bodyStyle: feature.snakeBody === 'blocks' ? 'blocks' : 'joints',
+        bodyWidth: feature.snakeBodyWidth,
+        isDead: false,
+        bodyAlpha: 1,
+      });
+    };
+    this.redrawPreview = draw;
+    draw();
 
-    head.on('pointerdown', () => {
-      this.snakeColors.head = getRandomColor();
-      head.setFillStyle(Phaser.Display.Color.HexStringToColor(this.snakeColors.head).color);
-      this.sendColorUpdate();
-    });
-    body.on('pointerdown', () => {
-      this.snakeColors.body = getRandomColor();
-      body.setFillStyle(Phaser.Display.Color.HexStringToColor(this.snakeColors.body).color);
-      this.sendColorUpdate();
-    });
-    eyes.on('pointerdown', () => {
-      this.snakeColors.eyes = getRandomColor();
-      eyes.setFillStyle(Phaser.Display.Color.HexStringToColor(this.snakeColors.eyes).color);
-      this.sendColorUpdate();
+    const zone = (part: PickerPart, x: number, y: number, width: number, height: number) => {
+      const area = this.add.zone(x, y, width, height).setOrigin(0).setInteractive({ useHandCursor: true });
+      area.on('pointerover', () => {
+        highlight.clear();
+        highlight.lineStyle(3, 0xffffff, 1);
+        highlight.strokeRect(x, y, width, height);
+      });
+      area.on('pointerout', () => highlight.clear());
+      area.on('pointerdown', () => {
+        highlight.clear();
+        this.openColorPicker(part);
+      });
+      return area;
+    };
+
+    // Later zones sit on top, so the eyes win over the head they are drawn on.
+    const body = zone('body', origin.x, origin.y, CELL * 2, CELL);
+    const head = zone('head', origin.x + CELL * 2, origin.y, CELL, CELL);
+    const eyes = zone('eyes', origin.x + CELL * 2 + CELL / 5 - 3, origin.y - 3, CELL * 0.6 + 6, CELL / 5 + 6);
+
+    this.colorSwatches = [bodyGraphics, graphics, highlight, body, head, eyes];
+  }
+
+  private openColorPicker(initial: PickerPart): void {
+    this.closeColorPicker();
+    const objects: Phaser.GameObjects.GameObject[] = [];
+    const DEPTH = 1000;
+    const COLS = 6;
+    const SWATCH = 40;
+    const GAP = 10;
+    const panelW = COLS * SWATCH + (COLS + 1) * GAP + 20;
+    const panelH = 210;
+    const left = 400 - panelW / 2;
+    const top = 300 - panelH / 2;
+
+    const backdrop = this.add.rectangle(0, 0, 800, 600, 0x000000, 0.5).setOrigin(0).setDepth(DEPTH)
+      .setInteractive();
+    backdrop.on('pointerdown', () => this.closeColorPicker());
+    const panel = this.add.rectangle(left, top, panelW, panelH, 0x222222).setOrigin(0).setDepth(DEPTH + 1)
+      .setStrokeStyle(2, 0xffffff).setInteractive();
+    objects.push(backdrop, panel);
+
+    let content: Phaser.GameObjects.GameObject[] = [];
+    const tabs = new Map<PickerPart, Phaser.GameObjects.Text>();
+
+    const showTab = (part: PickerPart) => {
+      content.forEach((obj) => obj.destroy());
+      tabs.forEach((tab, tabPart) => tab.setStyle({ backgroundColor: tabPart === part ? '#555555' : '#333333' }));
+      content = PALETTE.map((color, i) => {
+        const x = left + 10 + GAP + (i % COLS) * (SWATCH + GAP);
+        const y = top + 70 + Math.floor(i / COLS) * (SWATCH + GAP);
+        const swatch = this.add.rectangle(x, y, SWATCH, SWATCH, Phaser.Display.Color.HexStringToColor(color).color)
+          .setOrigin(0).setDepth(DEPTH + 2)
+          .setStrokeStyle(color.toLowerCase() === this.snakeColors[part].toLowerCase() ? 4 : 2, 0xffffff)
+          .setInteractive({ useHandCursor: true });
+        swatch.on('pointerdown', () => {
+          this.snakeColors[part] = color;
+          appearanceStore.save(this.snakeColors);
+          this.sendColorUpdate();
+          this.redrawPreview?.();
+          this.closeColorPicker();
+        });
+        return swatch;
+      });
+    };
+
+    // A future Skins tab is one more entry here.
+    const TABS: [PickerPart, string][] = [['head', 'Head'], ['body', 'Body'], ['eyes', 'Eyes']];
+    TABS.forEach(([part, label], i) => {
+      const tab = this.add.text(left + 20 + i * 90, top + 15, label, {
+        fontSize: '20px', color: '#ffffff', padding: { x: 10, y: 5 },
+      }).setDepth(DEPTH + 2).setInteractive({ useHandCursor: true });
+      tab.on('pointerdown', () => showTab(part));
+      tabs.set(part, tab);
+      objects.push(tab);
     });
 
-    this.colorSwatches = [label, head, body, eyes];
+    showTab(initial);
+
+    const onEsc = () => this.closeColorPicker();
+    this.input.keyboard?.on('keydown-ESC', onEsc);
+    this.colorPicker = {
+      close: () => {
+        this.input.keyboard?.off('keydown-ESC', onEsc);
+        objects.forEach((obj) => obj.destroy());
+        content.forEach((obj) => obj.destroy());
+      },
+    };
+  }
+
+  private closeColorPicker(): void {
+    this.colorPicker?.close();
+    this.colorPicker = undefined;
   }
 
   preload() {
@@ -239,6 +331,7 @@ export class GameScene extends Phaser.Scene {
       color: '#fff',
     }).setOrigin(0.5);
 
+    this.snakeColors = appearanceStore.load();
     this.createColorSwatches();
     this.displayLeaderboard();
 
@@ -390,8 +483,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Remove color customization swatches
+    this.closeColorPicker();
     this.colorSwatches.forEach((obj) => obj.destroy());
     this.colorSwatches = [];
+    this.redrawPreview = undefined;
 
     // Remove game-over overlay, if a new round is starting from it
     this.clearGameOverOverlay();
@@ -632,8 +727,10 @@ export class GameScene extends Phaser.Scene {
     this.scoreboardBg?.destroy();
     this.scoreboardHeader?.destroy();
     this.welcomeText?.destroy();
+    this.closeColorPicker();
     this.colorSwatches.forEach((obj) => obj.destroy());
     this.colorSwatches = [];
+    this.redrawPreview = undefined;
     this.reconnectText?.destroy();
     this.reconnectText = null;
   }
