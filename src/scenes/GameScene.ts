@@ -406,7 +406,8 @@ export class GameScene extends Phaser.Scene {
     this.clearGameOverOverlay();
 
     // Save the player's score to local storage
-    const playerRanking = payload.rankings.find(r => r.id === this.playerId);
+    const sessionId = socketManager.getRoom()?.sessionId;
+    const playerRanking = payload.rankings.find(r => r.id === sessionId);
     if (playerRanking) {
       LocalScoresManager.saveScore(playerRanking.score);
 
