@@ -1,6 +1,7 @@
 import { getRandomColor } from './utils'
 import { BodyTween } from './BodyTween'
 import { arcBodyPath } from './BodyPath'
+import { unwrapChain, wrapPieces, wrapCell } from './BodyWrap'
 import { feature } from './feature'
 
 interface SnakeColorSet {
@@ -22,6 +23,10 @@ const DEAD_ALPHA = 0.35
 export class Snake {
     private scene: Phaser.Scene
     private graphics: Phaser.GameObjects.Graphics
+    // The continuous bodies, masked to the game area so a body crossing the
+    // board edge can overhang it without drawing over the header.
+    private bodyGraphics: Phaser.GameObjects.Graphics
+    private bodyMask: Phaser.GameObjects.Graphics
     private gridSize: number
 
     public isDead: boolean = false
@@ -55,6 +60,11 @@ export class Snake {
             eyes: colors.eyes || getRandomColor()
         }
 
+        this.bodyGraphics = this.scene.add.graphics()
+        this.bodyGraphics.setDepth(9)
+        this.bodyMask = this.scene.make.graphics({}, false)
+        this.bodyGraphics.setMask(this.bodyMask.createGeometryMask())
+
         this.graphics = this.scene.add.graphics()
         this.graphics.setDepth(10)
     }
@@ -80,15 +90,20 @@ export class Snake {
         const segments = this.body.positionsAt(now)
 
         graphics.clear()
+        this.bodyGraphics.clear()
+        this.bodyMask.clear()
+        this.bodyMask.fillStyle(0xffffff, 1)
+        this.bodyMask.fillRect(0, yOffset, BOARD_CELLS * gridSize, BOARD_CELLS * gridSize)
 
         let headCell: GridPosition = segments[0]
 
         if (feature.snakeBody === 'blocks') {
             this.drawBlocks(segments.slice(1), yOffset)
         } else if (feature.snakeBody === 'arcs') {
-            const path = arcBodyPath(this.body.targets, this.body.tailPrevious, this.body.progressAt(now))
+            const chain = unwrapChain([...this.body.targets, this.body.tailPrevious], BOARD_CELLS)
+            const path = arcBodyPath(chain.slice(0, -1), chain[chain.length - 1], this.body.progressAt(now))
             this.drawPath(path, yOffset)
-            if (feature.snakeHeadFollowsArc && path.length > 0) headCell = path[0]
+            if (feature.snakeHeadFollowsArc && path.length > 0) headCell = wrapCell(path[0], BOARD_CELLS)
         } else {
             this.drawJoints(segments, yOffset)
         }
@@ -165,8 +180,10 @@ export class Snake {
      * line with a circle on every joint to round it.
      */
     private drawJoints(segments: GridPosition[], yOffset: number): void {
-        const centres = segments.map(({ x, y }) => this.toPixels(x, y, yOffset))
-        this.strokeDoubleLine(centres, { roundJoints: true })
+        const pieces = wrapPieces(unwrapChain(segments, BOARD_CELLS), BOARD_CELLS)
+        for (const piece of pieces) {
+            this.strokeDoubleLine(piece.map(({ x, y }) => this.toPixels(x, y, yOffset)), { roundJoints: true })
+        }
     }
 
     /**
@@ -175,8 +192,9 @@ export class Snake {
      * a curve that's already round.
      */
     private drawPath(path: GridPosition[], yOffset: number): void {
-        const points = path.map(({ x, y }) => this.toPixels(x, y, yOffset))
-        this.strokeDoubleLine(points, { roundJoints: false })
+        for (const piece of wrapPieces(path, BOARD_CELLS)) {
+            this.strokeDoubleLine(piece.map(({ x, y }) => this.toPixels(x, y, yOffset)), { roundJoints: false })
+        }
     }
 
     private toPixels(x: number, y: number, yOffset: number): { x: number; y: number } {
@@ -190,7 +208,7 @@ export class Snake {
      * circle at every point, for a polyline whose corners are square.
      */
     private strokeDoubleLine(points: { x: number; y: number }[], { roundJoints }: { roundJoints: boolean }): void {
-        const { graphics, gridSize, colors } = this
+        const { bodyGraphics: graphics, gridSize, colors } = this
         const transparent = this.bodyAlpha
         const width = feature.snakeBodyWidth * gridSize
         if (points.length < 2) return
@@ -210,6 +228,9 @@ export class Snake {
 
     destroy(): void {
         this.graphics.destroy()
+        this.bodyGraphics.clearMask(true)
+        this.bodyGraphics.destroy()
+        this.bodyMask.destroy()
     }
 
     async stop(playerId: string, score: number, isAnonymous: boolean): Promise<void> {
