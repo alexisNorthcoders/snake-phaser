@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createNameStore, normaliseName } from '../src/nameStore.ts';
+import { sessionName } from '../src/userData.ts';
 
 class MemoryStorage {
   items = new Map<string, string>();
@@ -79,4 +80,23 @@ test('an over-long stored name is cut when read back', () => {
   const storage = new MemoryStorage();
   storage.setItem('playerName', 'c'.repeat(30));
   assert.equal(createNameStore(storage).load(), 'c'.repeat(16));
+});
+
+test('logging in from a guest session plays as the account username and leaves the guest name alone', () => {
+  const storage = new MemoryStorage();
+  const store = createNameStore(storage);
+  store.save('Ada');
+  const before = new Map(storage.items);
+
+  assert.equal(sessionName({ username: 'grace', isGuest: false }, store), 'grace');
+  assert.deepEqual(storage.items, before);
+  assert.equal(store.saved(), 'Ada');
+});
+
+test('after logging out, a guest session is offered the earlier guest name again', () => {
+  const store = createNameStore(new MemoryStorage());
+  store.save('Ada');
+  sessionName({ username: 'grace', isGuest: false }, store);
+  assert.equal(sessionName({ username: 'anonymous', isGuest: true }, store), 'Ada');
+  assert.equal(store.saved(), 'Ada');
 });

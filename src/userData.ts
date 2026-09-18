@@ -14,3 +14,11 @@ const LEGACY_GUEST_NAME = 'anonymous'
 export function isGuest(user: Pick<StoredUser, 'isGuest' | 'username'>): boolean {
   return user.isGuest ?? user.username === LEGACY_GUEST_NAME
 }
+
+/**
+ * The name a session plays under. Guests use their remembered name; logged-in players use their
+ * account username. Read-only: the remembered guest name is never written or cleared here.
+ */
+export function sessionName(user: StoredUser, store: { load(): string }): string {
+  return isGuest(user) ? store.load() : (user.username ?? LEGACY_GUEST_NAME);
+}
