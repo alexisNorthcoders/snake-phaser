@@ -1,5 +1,6 @@
 import InputText from "phaser3-rex-plugins/plugins/inputtext";
 import { ClientIdManager } from "../utils/clientIdManager";
+import { migrateAnonymousScores } from "../utils/scoreMigrationHelper";
 
 export class LoginScene extends Phaser.Scene {
     private passwordText!: InputText
@@ -142,11 +143,24 @@ export class LoginScene extends Phaser.Scene {
 
         if (res.ok) {
             const data = await res.json();
+            const token = data.accessToken;
+            const userId = data.userId;
+
             localStorage.setItem('userData', JSON.stringify({
-                token: data.accessToken,
+                token: token,
                 username: username,
-                userId: data.userId,
+                userId: userId,
             }));
+
+            // Migrate anonymous scores if any exist
+            const migrationMessage = await migrateAnonymousScores(token, userId);
+            if (migrationMessage && migrationMessage !== 'Login successful!') {
+                this.errorText.setStyle({ color: '#00ff00' });
+                this.errorText.setText(migrationMessage);
+                // Wait 2 seconds for user to see migration status
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
             this.startGame();
         } else {
             this.errorText.setText('Login failed. Please check credentials.');
