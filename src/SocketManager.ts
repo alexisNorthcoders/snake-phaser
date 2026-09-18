@@ -2,7 +2,7 @@ import { Client, Room } from "colyseus.js";
 import { Snake } from "./Snake";
 import { GameScene } from "./scenes/GameScene";
 import { Food } from "./Food";
-import { GameState } from "./schemas/Food";
+import { GameState, tailCells } from "./schemas/Food";
 import { drawBackground } from "./utils";
 
 class SocketManager {
@@ -142,7 +142,7 @@ class SocketManager {
               }
 
               if (!currentSnake.isDead) {
-                currentSnake.tail = player.snake.tail.map((segment) => ({ x: segment.x, y: segment.y }));
+                currentSnake.tail = tailCells(player.snake);
                 currentSnake.food = player.snake.score;
                 currentSnake.position({ x: player.snake.x, y: player.snake.y });
 
