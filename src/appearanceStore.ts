@@ -20,6 +20,8 @@ export interface AppearanceStore {
   /** The saved colours; parts that are missing or invalid are random palette colours. Saves what it returns. */
   load(): Appearance;
   save(colours: Appearance): void;
+  /** The saved colours only if all three parts are valid; never generates or saves anything. */
+  peek(): Appearance | undefined;
 }
 
 export function createAppearanceStore(
@@ -57,11 +59,21 @@ export function createAppearanceStore(
       return colours;
     },
     save,
+    peek() {
+      const stored = readStored();
+      const colours = {} as Appearance;
+      for (const part of PARTS) {
+        const value = stored[part];
+        if (typeof value !== 'string' || !HEX.test(value)) return undefined;
+        colours[part] = value;
+      }
+      return colours;
+    },
   };
 }
 
 export interface AccountAppearanceStore {
-  /** The account's saved colours; parts that are missing or invalid, or all of them on any failure, are random palette colours. Never rejects. */
+  /** The account's saved colours; with nothing saved, the anonymous colours (if any) are saved to the account and returned. Parts that are missing or invalid, or all of them on any failure, are random palette colours. Never rejects. */
   load(): Promise<Appearance>;
   /** Sends the colours with `PUT /appearance` once no further save has come in for the debounce delay. */
   save(colours: Appearance): void;
@@ -73,6 +85,8 @@ export function createAccountAppearanceStore(options: {
   random?: () => number;
   debounceMs?: number;
   url?: string;
+  /** Anonymous colours to carry over when the account has none of its own. */
+  anonymous?: () => Appearance | undefined;
 }): AccountAppearanceStore {
   const { token, debounceMs = 500, url = '/api/appearance' } = options;
   const random = options.random ?? Math.random;
@@ -95,7 +109,12 @@ export function createAccountAppearanceStore(options: {
     async load() {
       try {
         const response = await options.fetch(url, { headers });
-        if (response.status === 404) return randomColours();
+        if (response.status === 404) {
+          const carried = options.anonymous?.();
+          if (!carried) return randomColours();
+          await put(carried);
+          return { ...carried };
+        }
         if (!response.ok) throw new Error(`status ${response.status}`);
         const stored = await response.json();
         const source = stored && typeof stored === 'object' ? stored : {};
