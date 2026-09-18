@@ -3,7 +3,7 @@ export type SnakeBodyStyle = 'blocks' | 'joints' | 'arcs'
 export interface FeatureSettings {
     snakeBody: SnakeBodyStyle
     snakeBodyWidth: number
-    /** Prints the current settings to the console. */
+    /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
 
@@ -62,10 +62,6 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         }
     }
 
-    if (values.snakeBody !== DEFAULTS.snakeBody) {
-        log(`snakeBody is '${values.snakeBody}' (width ${values.snakeBodyWidth}); feature.list() shows all settings`)
-    }
-
     return {
         get snakeBody() { return values.snakeBody },
         set snakeBody(style) {
@@ -78,7 +74,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             save()
         },
         list() {
-            log(`snakeBody = '${values.snakeBody}', snakeBodyWidth = ${values.snakeBodyWidth}`)
+            log([
+                'settings (assign in the console to change them):',
+                `  feature.snakeBody = '${values.snakeBody}'    // ${BODY_STYLES.map((style) => `'${style}'`).join(' | ')}`,
+                `  feature.snakeBodyWidth = ${values.snakeBodyWidth}    // ${MIN_WIDTH}–${MAX_WIDTH} cells, ignored by 'blocks'`,
+            ].join('\n'))
         },
     }
 }

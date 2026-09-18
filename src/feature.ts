@@ -13,7 +13,10 @@ declare global {
  */
 export const feature = createFeatureSettings(import.meta.env.DEV ? localStorageOrNothing() : undefined, console)
 
-if (import.meta.env.DEV) window.feature = feature
+if (import.meta.env.DEV) {
+    window.feature = feature
+    feature.list()
+}
 
 // Merely touching `window.localStorage` throws when site data is blocked.
 function localStorageOrNothing(): Storage | undefined {

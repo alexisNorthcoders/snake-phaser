@@ -81,7 +81,7 @@ test('a throwing or missing localStorage leaves the settings working for this se
   }
 });
 
-test('list() prints the current settings', () => {
+test('list() prints every setting with its current value and the values it accepts', () => {
   const out = quietLog();
   const feature = createFeatureSettings(new MemoryStorage(), out);
   feature.snakeBodyWidth = 0.6;
@@ -89,22 +89,15 @@ test('list() prints the current settings', () => {
 
   feature.list();
   const printed = out.lines.join('\n');
-  assert.match(printed, /snakeBody.*blocks/);
-  assert.match(printed, /snakeBodyWidth.*0\.6/);
+  assert.match(printed, /feature\.snakeBody = 'blocks'.*'blocks' \| 'joints' \| 'arcs'/);
+  assert.match(printed, /feature\.snakeBodyWidth = 0\.6.*0\.5–1/);
 });
 
-test('a style other than blocks is announced once at startup', () => {
+test('creating the settings prints nothing', () => {
   const storage = new MemoryStorage();
-  const quiet = quietLog();
-  createFeatureSettings(storage, quiet);
-  assert.equal(quiet.lines.length, 0);
-
   storage.setItem('feature', JSON.stringify({ snakeBody: 'joints' }));
   const out = quietLog();
-  const feature = createFeatureSettings(storage, out);
-  assert.equal(out.lines.length, 1);
-  assert.match(out.lines[0], /joints/);
+  createFeatureSettings(storage, out);
 
-  feature.snakeBody = 'arcs';
-  assert.equal(out.lines.length, 1);
+  assert.equal(out.lines.length, 0);
 });
