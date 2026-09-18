@@ -7,6 +7,7 @@ import { ColourPanel } from '../ColourPanel';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
 import { isGuest, sessionName } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
+import { createFpsMeter } from '../fpsMeter';
 import { createAccountAppearanceStore, createAppearanceStore, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
@@ -36,6 +37,8 @@ export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
   public scoreText!: Phaser.GameObjects.Text;
   public pingText!: Phaser.GameObjects.Text;
+  private fpsText?: Phaser.GameObjects.Text;
+  private fpsMeter = createFpsMeter();
   public playerNameText!: Phaser.GameObjects.Text;
   public scoreboardTexts: Map<string, Phaser.GameObjects.Text> = new Map();
   public scoreboardBg!: Phaser.GameObjects.Rectangle;
@@ -177,6 +180,10 @@ export class GameScene extends Phaser.Scene {
       fontSize: '20px',
       color: '#ffffff',
     }).setScrollFactor(0);
+
+    this.fpsText = undefined;
+    this.fpsMeter = createFpsMeter();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroyFpsText());
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
@@ -654,7 +661,28 @@ export class GameScene extends Phaser.Scene {
     this.food = [];
   }
 
-  update(): void {
+  private destroyFpsText() {
+    this.fpsText?.destroy();
+    this.fpsText = undefined;
+  }
+
+  private updateFps(deltaMs: number) {
+    if (!feature.showFps) {
+      this.destroyFpsText();
+      return;
+    }
+    const fps = this.fpsMeter.frame(deltaMs);
+    if (!this.fpsText) {
+      this.fpsText = this.add.text(this.scoreText.x, this.scoreText.y + this.scoreText.height + 4, 'FPS: --', {
+        fontSize: '20px',
+        color: '#ffffff',
+      }).setScrollFactor(0).setDepth(10);
+    }
+    if (fps !== undefined) this.fpsText.setText(`FPS: ${fps}`);
+  }
+
+  update(_time: number, delta: number): void {
+    this.updateFps(delta);
     if (!this.gameStarted) {
       return;
     }
@@ -698,6 +726,7 @@ export class GameScene extends Phaser.Scene {
     // Remove any remaining text objects
     this.scoreText?.destroy();
     this.pingText?.destroy();
+    this.destroyFpsText();
     this.playerNameText?.destroy();
     this.scoreboardBg?.destroy();
     this.scoreboardHeader?.destroy();

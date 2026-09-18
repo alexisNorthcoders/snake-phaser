@@ -115,3 +115,26 @@ test('creating the settings prints nothing', () => {
 
   assert.equal(out.lines.length, 0);
 });
+
+test('showFps defaults to false, persists, and a non-boolean warns and resets to false', () => {
+  const storage = new MemoryStorage();
+  const out = quietLog();
+  const feature = createFeatureSettings(storage, out);
+  assert.equal(feature.showFps, false);
+
+  feature.showFps = true;
+  assert.equal(createFeatureSettings(storage, quietLog()).showFps, true);
+
+  feature.showFps = 'yes' as never;
+  assert.equal(feature.showFps, false);
+  assert.match(out.lines.join('\n'), /showFps/);
+
+  storage.setItem('feature', JSON.stringify({ showFps: 1 }));
+  assert.equal(createFeatureSettings(storage, quietLog()).showFps, false);
+});
+
+test('list() shows showFps', () => {
+  const out = quietLog();
+  createFeatureSettings(new MemoryStorage(), out).list();
+  assert.match(out.lines.join('\n'), /feature\.showFps = false.*true \| false/);
+});
