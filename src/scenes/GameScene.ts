@@ -7,7 +7,7 @@ import { ColourPanel } from '../ColourPanel';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
 import { isGuest, sessionName } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
-import { createFpsMeter } from '../fpsMeter';
+import { createFpsMeter, formatFpsReadout } from '../fpsMeter';
 import { createAccountAppearanceStore, createAppearanceStore, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
@@ -671,14 +671,14 @@ export class GameScene extends Phaser.Scene {
       this.destroyFpsText();
       return;
     }
-    const fps = this.fpsMeter.frame(deltaMs);
+    const report = this.fpsMeter.frame(deltaMs);
     if (!this.fpsText) {
       this.fpsText = this.add.text(this.scoreText.x, this.scoreText.y + this.scoreText.height + 4, 'FPS: --', {
         fontSize: '20px',
         color: '#ffffff',
       }).setScrollFactor(0).setDepth(10);
     }
-    if (fps !== undefined) this.fpsText.setText(`FPS: ${fps}`);
+    if (report) this.fpsText.setText(formatFpsReadout(report));
   }
 
   update(_time: number, delta: number): void {
