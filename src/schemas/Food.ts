@@ -8,7 +8,7 @@ export class Food extends Schema {
     @type("string") type: FoodType = "redApple";
 }
 
-/** Mirrors the server's `Coordinates`, which backs tail segments, speed and direction. */
+/** Mirrors the server's `Coordinates`, which backs tail segments and direction. */
 export class Coordinates extends Schema {
     @type("number") x: number = 0;
     @type("number") y: number = 0;
@@ -27,7 +27,6 @@ export class SnakeState extends Schema {
     @type("boolean") isDead: boolean = false;
     @type("number") score: number = 0;
     @type("number") size: number = 0;
-    @type(Coordinates) speed = new Coordinates();
     @type(Coordinates) direction = new Coordinates();
     @type("string") type: string = "player";
     @type("string") playerId: string = "";
@@ -43,7 +42,6 @@ export class Player extends Schema {
 
 export class GameState extends Schema {
     @type("boolean") hasGameStarted: boolean = false;
-    @type("number") nextPositionIndex: number = 0;
     @type("number") aliveCount: number = 0;
     @type("number") backgroundNumber: number = 0;
     @type([Player]) players = new ArraySchema<Player>();
