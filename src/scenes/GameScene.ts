@@ -191,7 +191,7 @@ export class GameScene extends Phaser.Scene {
     }).setScrollFactor(0);
 
     // Logout button
-    const logoutButton = this.add.text(700, 10, 'Logout', {
+    const logoutButton = this.add.text(700, 20, 'Logout', {
       fontSize: '20px',
       color: '#ff0000',
       backgroundColor: '#222',
