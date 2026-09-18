@@ -673,7 +673,7 @@ export class GameScene extends Phaser.Scene {
     }
     const fps = this.fpsMeter.frame(deltaMs);
     if (!this.fpsText) {
-      this.fpsText = this.add.text(10, 40, 'FPS: --', {
+      this.fpsText = this.add.text(this.scoreText.x, this.scoreText.y + this.scoreText.height + 4, 'FPS: --', {
         fontSize: '20px',
         color: '#ffffff',
       }).setScrollFactor(0).setDepth(10);

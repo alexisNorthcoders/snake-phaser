@@ -19,7 +19,8 @@ export function createFpsMeter(windowMs = 500): FpsMeter {
             if (elapsed < windowMs) return undefined
             const fps = fpsOf(frames, elapsed)
             frames = 0
-            elapsed = 0
+            // Carry the overshoot into the next window; % keeps one huge frame from closing several windows.
+            elapsed %= windowMs
             return fps
         },
     }
