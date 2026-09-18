@@ -138,3 +138,26 @@ test('list() shows showFps', () => {
   createFeatureSettings(new MemoryStorage(), out).list();
   assert.match(out.lines.join('\n'), /feature\.showFps = false.*true \| false/);
 });
+
+test('lobbyAmbience defaults to true, persists, and a non-boolean warns and resets to true', () => {
+  const storage = new MemoryStorage();
+  const out = quietLog();
+  const feature = createFeatureSettings(storage, out);
+  assert.equal(feature.lobbyAmbience, true);
+
+  feature.lobbyAmbience = false;
+  assert.equal(createFeatureSettings(storage, quietLog()).lobbyAmbience, false);
+
+  feature.lobbyAmbience = 'no' as never;
+  assert.equal(feature.lobbyAmbience, true);
+  assert.match(out.lines.join('\n'), /lobbyAmbience/);
+
+  storage.setItem('feature', JSON.stringify({ lobbyAmbience: 0 }));
+  assert.equal(createFeatureSettings(storage, quietLog()).lobbyAmbience, true);
+});
+
+test('list() shows lobbyAmbience', () => {
+  const out = quietLog();
+  createFeatureSettings(new MemoryStorage(), out).list();
+  assert.match(out.lines.join('\n'), /feature\.lobbyAmbience = true.*true \| false/);
+});

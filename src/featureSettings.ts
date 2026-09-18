@@ -7,6 +7,8 @@ export interface FeatureSettings {
     snakeHeadFollowsArc: boolean
     /** Shows a live FPS readout on a second HUD row. */
     showFps: boolean
+    /** Decorative snake wandering the edge of the initial lobby. */
+    lobbyAmbience: boolean
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -20,9 +22,9 @@ const BODY_STYLES: SnakeBodyStyle[] = ['blocks', 'joints', 'arcs']
 const MIN_WIDTH = 0.5
 const MAX_WIDTH = 1
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -56,12 +58,19 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return DEFAULTS.showFps
     }
 
+    const ambienceFlag = (value: unknown): boolean => {
+        if (typeof value === 'boolean') return value
+        warn(`lobbyAmbience must be a boolean, got ${JSON.stringify(value)}; using ${DEFAULTS.lobbyAmbience}`)
+        return DEFAULTS.lobbyAmbience
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
         snakeBodyWidth: 'snakeBodyWidth' in stored ? bodyWidth(stored.snakeBodyWidth) : DEFAULTS.snakeBodyWidth,
         snakeHeadFollowsArc: 'snakeHeadFollowsArc' in stored ? headFollowsArc(stored.snakeHeadFollowsArc) : DEFAULTS.snakeHeadFollowsArc,
         showFps: 'showFps' in stored ? fpsFlag(stored.showFps) : DEFAULTS.showFps,
+        lobbyAmbience: 'lobbyAmbience' in stored ? ambienceFlag(stored.lobbyAmbience) : DEFAULTS.lobbyAmbience,
     }
     const save = () => {
         try {
@@ -101,6 +110,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.showFps = fpsFlag(show)
             save()
         },
+        get lobbyAmbience() { return values.lobbyAmbience },
+        set lobbyAmbience(show) {
+            values.lobbyAmbience = ambienceFlag(show)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
@@ -108,6 +122,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.snakeBodyWidth = ${values.snakeBodyWidth}    // ${MIN_WIDTH}–${MAX_WIDTH} cells, ignored by 'blocks'`,
                 `  feature.snakeHeadFollowsArc = ${values.snakeHeadFollowsArc}    // true | false, only used by 'arcs'`,
                 `  feature.showFps = ${values.showFps}    // true | false, live FPS readout under Score`,
+                `  feature.lobbyAmbience = ${values.lobbyAmbience}    // true | false, decorative snake around the lobby edge`,
             ].join('\n'))
         },
     }

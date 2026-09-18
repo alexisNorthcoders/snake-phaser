@@ -4,6 +4,7 @@ import { Food } from '../Food';
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
 import { ColourPanel } from '../ColourPanel';
+import { LobbyAmbience, BACKGROUND_DEPTH } from '../LobbyAmbience';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
 import { isGuest, sessionName } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
@@ -62,6 +63,7 @@ export class GameScene extends Phaser.Scene {
   private guest: boolean = false;
   private startButton?: Phaser.GameObjects.Text;
   private colourPanel?: ColourPanel;
+  private lobbyAmbience?: LobbyAmbience;
   private colourSelection?: ColourSelection;
   private accountAppearance?: AccountAppearanceStore;
   private nameField?: InputText;
@@ -146,6 +148,11 @@ export class GameScene extends Phaser.Scene {
     this.colourSelection = undefined;
   }
 
+  private destroyLobbyAmbience(): void {
+    this.lobbyAmbience?.destroy();
+    this.lobbyAmbience = undefined;
+  }
+
   preload() {
     this.load.image('redApple', 'assets/images/food/tile000.png');
     this.load.image('greenApple', 'assets/images/food/tile001.png');
@@ -167,7 +174,7 @@ export class GameScene extends Phaser.Scene {
       this.scale.width,
       this.scale.height - 40,
       '1'
-    ).setOrigin(0, 0);
+    ).setOrigin(0, 0).setDepth(BACKGROUND_DEPTH);
 
     this.add.rectangle(0, 0, this.scale.width, 40, 0x000000, 0.6).setOrigin(0);
 
@@ -183,7 +190,10 @@ export class GameScene extends Phaser.Scene {
 
     this.fpsText = undefined;
     this.fpsMeter = createFpsMeter();
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroyFpsText());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.destroyFpsText();
+      this.destroyLobbyAmbience();
+    });
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
@@ -309,6 +319,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.displayLeaderboard();
 
+    if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this);
+
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
 
@@ -317,6 +329,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   async logout() {
+
+    this.destroyLobbyAmbience();
 
     socketManager.close();
 
@@ -462,6 +476,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.destroyNameField();
+
+    this.destroyLobbyAmbience();
 
     // Remove color customization swatches
     this.destroyColourPanel();
@@ -733,6 +749,7 @@ export class GameScene extends Phaser.Scene {
     this.welcomeText?.destroy();
     this.destroyNameField();
     this.destroyColourPanel();
+    this.destroyLobbyAmbience();
     this.reconnectText?.destroy();
     this.reconnectText = null;
   }
