@@ -1,7 +1,9 @@
 import { drawSnake } from './SnakeDrawing';
 import { feature } from './feature';
-import { AMBIENT_CELL, HUD_HEIGHT, STEP_MS, createAmbientSnake, gridFor, inBand, type AmbientSnake } from './ambientSnake';
+import { AMBIENT_CELL, HUD_HEIGHT, STEP_MS, gridFor, inBand } from './ambientSnake';
 import { createAmbientFruit, type AmbientFruitField } from './ambientFruit';
+import { createAmbience, type Ambience } from './ambience';
+import type { Appearance } from './appearanceStore';
 
 const ALPHA = 0.6;
 /** Above the background tile (depth -2), below every lobby UI object (depth 0). */
@@ -10,45 +12,49 @@ export const BACKGROUND_DEPTH = -2;
 
 const FRUIT_KEYS = ['redApple', 'greenApple', 'yellowApple', 'cherry', 'banana'];
 
-const COLOURS = { body: '#2a9d3f', head: '#e63946', eyes: '#ffffff' };
+const EYES = '#ffffff';
 
 /**
- * The lobby's decorative snake round the screen edge. Purely client-side: it owns every object it
+ * The lobby's decorative snakes round the screen edge. Purely client-side: it owns every object it
  * creates and removes them, and its timer, in destroy().
  */
 export class LobbyAmbience {
-  private readonly bodyGraphics: Phaser.GameObjects.Graphics;
-  private readonly graphics: Phaser.GameObjects.Graphics;
+  private readonly layers: { bodyGraphics: Phaser.GameObjects.Graphics; graphics: Phaser.GameObjects.Graphics }[];
   private readonly timer: Phaser.Time.TimerEvent;
-  private readonly snake: AmbientSnake;
+  private readonly world: Ambience;
   private readonly fruitField: AmbientFruitField;
   private readonly fruitImages: Phaser.GameObjects.Image[] = [];
   private readonly scene: Phaser.Scene;
 
-  constructor(scene: Phaser.Scene) {
+  /** `playerColours` is read every step, so ambient snakes never wear what the player's snake wears. */
+  constructor(scene: Phaser.Scene, playerColours: () => Appearance | undefined) {
     this.scene = scene;
     const grid = gridFor(scene.scale.width, scene.scale.height);
-    this.snake = createAmbientSnake({
+    this.world = createAmbience({
       grid,
       random: Math.random,
+      playerColours,
       fruit: () => this.fruitField.fruit.map((f) => f.cell),
       onEat: (cell) => this.fruitField.eat(cell),
     });
-    // The snake reads the field lazily, so the field can be built once the snake exists.
+    // The snakes read the field lazily, so the field can be built once the snakes exist.
     this.fruitField = createAmbientFruit({
       grid,
       random: Math.random,
       allowed: (cell) => inBand(grid, cell),
-      occupied: () => this.snake.cells,
+      occupied: () => this.world.snakes.flatMap((snake) => snake.cells),
       kinds: FRUIT_KEYS.length,
     });
-    this.bodyGraphics = scene.add.graphics().setDepth(AMBIENCE_DEPTH).setAlpha(ALPHA);
-    this.graphics = scene.add.graphics().setDepth(AMBIENCE_DEPTH).setAlpha(ALPHA);
+    // One pair per snake, so each can fade on its own.
+    this.layers = this.world.snakes.map(() => ({
+      bodyGraphics: scene.add.graphics().setDepth(AMBIENCE_DEPTH),
+      graphics: scene.add.graphics().setDepth(AMBIENCE_DEPTH),
+    }));
     this.timer = scene.time.addEvent({
       delay: STEP_MS,
       loop: true,
       callback: () => {
-        this.snake.step();
+        this.world.step(STEP_MS);
         this.fruitField.tick(STEP_MS);
         this.draw();
       },
@@ -58,8 +64,10 @@ export class LobbyAmbience {
 
   destroy(): void {
     this.timer.remove(false);
-    this.bodyGraphics.destroy();
-    this.graphics.destroy();
+    this.layers.forEach(({ bodyGraphics, graphics }) => {
+      bodyGraphics.destroy();
+      graphics.destroy();
+    });
     this.fruitImages.forEach((image) => image.destroy());
   }
 
@@ -81,17 +89,21 @@ export class LobbyAmbience {
 
   private draw(): void {
     this.drawFruit();
-    this.bodyGraphics.clear();
-    this.graphics.clear();
-    drawSnake({ graphics: this.graphics, bodyGraphics: this.bodyGraphics }, {
-      cells: [...this.snake.cells],
-      colors: COLOURS,
-      cellSize: AMBIENT_CELL,
-      origin: { x: 0, y: HUD_HEIGHT },
-      bodyStyle: feature.snakeBody === 'blocks' ? 'blocks' : 'joints',
-      bodyWidth: feature.snakeBodyWidth,
-      isDead: false,
-      bodyAlpha: 1,
+    this.world.snakes.forEach((snake, i) => {
+      const { bodyGraphics, graphics } = this.layers[i];
+      bodyGraphics.clear().setAlpha(ALPHA * snake.opacity);
+      graphics.clear().setAlpha(ALPHA * snake.opacity);
+      if (snake.opacity === 0) return;
+      drawSnake({ graphics, bodyGraphics }, {
+        cells: [...snake.cells],
+        colors: { ...snake.colours, eyes: EYES },
+        cellSize: AMBIENT_CELL,
+        origin: { x: 0, y: HUD_HEIGHT },
+        bodyStyle: feature.snakeBody === 'blocks' ? 'blocks' : 'joints',
+        bodyWidth: feature.snakeBodyWidth,
+        isDead: snake.dead,
+        bodyAlpha: 1,
+      });
     });
   }
 }

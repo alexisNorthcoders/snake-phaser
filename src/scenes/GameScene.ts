@@ -319,7 +319,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.displayLeaderboard();
 
-    if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this);
+    if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this, () => this.snakeColors);
 
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
