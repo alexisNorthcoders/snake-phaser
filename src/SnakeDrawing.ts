@@ -1,3 +1,4 @@
+import { tailCap } from './BodyPath'
 import { unwrapChain, wrapPieces } from './BodyWrap'
 
 export interface Cell {
@@ -70,7 +71,9 @@ export function drawSnake({ graphics, bodyGraphics }: Targets, snake: SnakeDrawi
         })
     } else if (snake.bodyStyle === 'path') {
         // Already a smooth poly-line, so no circles on the joints: they'd blob a curve that's already round.
-        for (const piece of pieces(snake.path ?? [])) strokeLine(piece.map(toPixels), false)
+        const path = snake.path ?? []
+        for (const piece of pieces(path)) strokeLine(piece.map(toPixels), false)
+        drawTailCap(bodyGraphics, path, toPixels, snake, bodyAlpha)
         if (snake.headCell) headCell = snake.headCell
     } else {
         const chain = snake.wrapCells === undefined ? cells : unwrapChain(cells, snake.wrapCells)
@@ -145,4 +148,39 @@ function strokeDoubleLine(
 
     pass(0x000000, width + 2)
     pass(hex(bodyColor), width - 2)
+}
+
+/**
+ * A bordered half-disc closing the tail end, drawn in the same two passes as the
+ * line. Half rather than whole, so a translucent body shows no darker overlap.
+ * Repeated per board copy, like `wrapPieces`; the body mask clips the overhang.
+ */
+function drawTailCap(
+    graphics: Phaser.GameObjects.Graphics,
+    path: Cell[],
+    toPixels: (cell: Cell) => Cell,
+    { colors, cellSize, bodyWidth, wrapCells }: SnakeDrawing,
+    alpha: number
+): void {
+    const cap = tailCap(path)
+    if (!cap) return
+
+    const centre = toPixels(cap.centre)
+    const board = wrapCells === undefined ? 0 : wrapCells * cellSize
+    const shifts = board === 0 ? [0] : [-board, 0, board]
+    const width = bodyWidth * cellSize
+
+    const pass = (color: number, radius: number) => {
+        graphics.fillStyle(color, alpha)
+        for (const dx of shifts) {
+            for (const dy of shifts) {
+                graphics.beginPath()
+                graphics.arc(centre.x + dx, centre.y + dy, radius, cap.angle - Math.PI / 2, cap.angle + Math.PI / 2)
+                graphics.fillPath()
+            }
+        }
+    }
+
+    pass(0x000000, (width + 2) / 2)
+    pass(hex(colors.body), (width - 2) / 2)
 }
