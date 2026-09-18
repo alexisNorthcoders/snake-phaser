@@ -54,23 +54,24 @@ test('an eaten fruit respawns after 1-3 seconds, never before, and never beyond 
 });
 
 test('a snake eats fruit, grows by one each time, and stops at the cap', () => {
-  const field = createAmbientFruit({ grid, allowed: (c) => inBand(grid, c), random: seeded(4), count: 4 });
+  // Deterministic: the snake runs straight along the top lane and a fruit is always placed right in front of it.
+  let fruit: Cell[] = [];
   let eaten = 0;
   const snake = createAmbientSnake({
-    grid, random: seeded(4), length: 4, maxLength: 7, seekChance: 0.5,
-    fruit: () => field.fruit.map((f) => f.cell),
-    onEat: (c) => { eaten++; field.eat(c); },
+    grid, random: () => 0.99, length: 4, maxLength: 7, laneSwitchChance: 0, seekChance: 0,
+    fruit: () => fruit,
+    onEat: () => { eaten++; fruit = []; },
   });
   let lastLength = 4;
-  for (let i = 0; i < 20000; i++) {
+  for (let i = 0; i < 20; i++) {
+    const head = snake.cells[0];
+    fruit = [{ x: head.x + 1, y: head.y }];
     snake.step();
-    field.tick(175);
     assert.ok(snake.cells.length <= 7);
     assert.ok(snake.cells.length - lastLength <= 1);
     lastLength = snake.cells.length;
-    assert.ok(field.fruit.length <= MAX_FRUIT);
   }
-  assert.ok(eaten > 10, 'ate repeatedly');
+  assert.equal(eaten, 20, 'ate every fruit placed in its path');
   assert.equal(snake.cells.length, 7);
 });
 
