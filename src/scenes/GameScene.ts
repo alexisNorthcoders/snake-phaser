@@ -352,6 +352,7 @@ export class GameScene extends Phaser.Scene {
       this.accountAppearance = createAccountAppearanceStore({
         fetch: (input, init) => fetch(input, init),
         token: userData.token,
+        anonymous: () => appearanceStore.peek(),
       });
       this.accountAppearance.load().then((colours) => {
         if (!this.sys.isActive()) return;

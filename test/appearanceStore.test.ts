@@ -173,3 +173,48 @@ test('a failed account save is logged, not retried, and does not throw', async (
   });
   assert.equal(attempts, 1);
 });
+
+test('an account with nothing saved takes over the anonymous colours and saves them', async () => {
+  const anonymous = { head: '#e63946', body: '#1d3557', eyes: '#ffffff' };
+  const calls: { init?: RequestInit }[] = [];
+  const store = createAccountAppearanceStore({
+    token: 'abc',
+    anonymous: () => anonymous,
+    fetch: async (_url, init) => { calls.push({ init }); return init?.method === 'PUT' ? json(200) : json(404); },
+  });
+
+  assert.deepEqual(await store.load(), anonymous);
+  const put = calls.find((c) => c.init?.method === 'PUT');
+  assert.deepEqual(JSON.parse(String(put?.init?.body)), anonymous);
+});
+
+test('an account with saved colours wins over the anonymous ones and is not overwritten', async () => {
+  const saved = { head: '#2a9d3f', body: '#111111', eyes: '#f2c200' };
+  const methods: (string | undefined)[] = [];
+  const store = createAccountAppearanceStore({
+    token: 't',
+    anonymous: () => ({ head: '#e63946', body: '#1d3557', eyes: '#ffffff' }),
+    fetch: async (_url, init) => { methods.push(init?.method); return json(200, saved); },
+  });
+
+  assert.deepEqual(await store.load(), saved);
+  assert.ok(!methods.includes('PUT'));
+});
+
+test('anonymous colours are still there after they are carried over', () => {
+  const storage = new MemoryStorage();
+  const colours = { head: PALETTE[1], body: PALETTE[2], eyes: PALETTE[3] };
+  const anonymous = createAppearanceStore(storage);
+  anonymous.save(colours);
+
+  assert.deepEqual(anonymous.peek(), colours);
+  assert.deepEqual(createAppearanceStore(storage).load(), colours);
+});
+
+test('peek finds nothing when no valid anonymous colours are stored, and saves nothing', () => {
+  const storage = new MemoryStorage();
+  assert.equal(createAppearanceStore(storage).peek(), undefined);
+  storage.setItem('appearance', JSON.stringify({ head: '#e63946', body: 'red', eyes: '#ffffff' }));
+  assert.equal(createAppearanceStore(storage).peek(), undefined);
+  assert.equal(storage.items.get('appearance')?.includes('red'), true);
+});
