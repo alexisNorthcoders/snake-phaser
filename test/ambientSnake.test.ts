@@ -48,11 +48,14 @@ test('no band cell overlaps any lobby UI area, and the band sits below the HUD b
 test('every move stays in the band, one cell at a time, without overlapping itself', () => {
   const snake = createAmbientSnake({ grid, random: seeded(1) });
   for (let i = 0; i < 3000; i++) {
-    const before = snake.cells[0];
     snake.step();
     const head = snake.cells[0];
     assert.ok(inBand(grid, head), `left the band at ${head.x},${head.y}`);
-    assert.ok(Math.abs(head.x - before.x) + Math.abs(head.y - before.y) <= 1);
+    // Contiguous body (the snake may reverse out of a self-made dead end, swapping head and tail).
+    snake.cells.slice(1).forEach((c, j) => {
+      const p = snake.cells[j];
+      assert.equal(Math.abs(c.x - p.x) + Math.abs(c.y - p.y), 1);
+    });
     assert.equal(new Set(snake.cells.map((c) => `${c.x},${c.y}`)).size, snake.cells.length);
   }
 });
@@ -95,7 +98,9 @@ test('it never steps onto a blocked cell, and waits when boxed in', () => {
     assert.ok(!snake.cells.some((c) => c.x === 4 && c.y === 0));
   }
 
-  const boxed = createAmbientSnake({ grid, random: seeded(2), length: 4, blocked: () => true });
+  let boxedIn = false;
+  const boxed = createAmbientSnake({ grid, random: seeded(2), length: 4, blocked: () => boxedIn });
+  boxedIn = true;
   const before = JSON.stringify(boxed.cells);
   boxed.step();
   assert.equal(JSON.stringify(boxed.cells), before);
@@ -109,4 +114,30 @@ test('with no randomness a snake goes straight, turns at the corner and never le
   assert.equal(snake.cells[0].x, 39);
   assert.equal(snake.cells[0].y, 1);
   assert.equal(AMBIENT_CELL, 20);
+});
+
+test('it starts on a free in-band stretch, and rejects a band with none', () => {
+  const snake = createAmbientSnake({ grid, random: seeded(1), length: 8, blocked: (c) => c.y === 0 && c.x < 3 });
+  for (const c of snake.cells) {
+    assert.ok(inBand(grid, c));
+    assert.ok(!(c.y === 0 && c.x < 3));
+  }
+  assert.throws(() => createAmbientSnake({ grid, random: seeded(1), blocked: () => true }));
+});
+
+test('it reverses out of a dead end and keeps circulating', () => {
+  // A wall across both top lanes at x=20 blocks forward and sideways-free options only after reversing.
+  const snake = createAmbientSnake({
+    grid, random: seeded(5), length: 4,
+    blocked: (c) => c.x === 20 && c.y < BAND_LANES,
+  });
+  const seen = new Set<number>();
+  for (let i = 0; i < 3000; i++) {
+    snake.step();
+    assert.ok(inBand(grid, snake.cells[0]));
+    assert.ok(!snake.cells.some((c) => c.x === 20 && c.y < BAND_LANES));
+    seen.add(snake.cells[0].x);
+  }
+  assert.ok(seen.has(0) || seen.has(1), 'went back the other way round');
+  assert.ok(seen.has(39), 'reached the far side');
 });

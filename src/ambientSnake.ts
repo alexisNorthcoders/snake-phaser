@@ -68,7 +68,7 @@ export interface AmbientSnakeOptions {
 export interface AmbientSnake {
     /** Head first. */
     readonly cells: readonly Cell[]
-    /** Moves one cell; stays put when every move is blocked. */
+    /** Moves one cell, reversing out of dead ends; stays put only when boxed in completely. */
     step(): void
 }
 
@@ -82,11 +82,20 @@ export function createAmbientSnake({
     blocked = () => false,
     laneSwitchChance = 0.08,
 }: AmbientSnakeOptions): AmbientSnake {
-    let heading = DIRECTIONS[0]
-    let cells: Cell[] = Array.from({ length }, (_, i) => ({ x: length - 1 - i, y: 0 }))
-
-    const free = (cell: Cell, body: Cell[]) =>
+    const free = (cell: Cell, body: readonly Cell[]) =>
         inBand(grid, cell) && !blocked(cell) && !body.some((c) => c.x === cell.x && c.y === cell.y)
+
+    // Start as a straight run heading right along a free stretch of the top two lanes.
+    let start: Cell[] | undefined
+    for (let y = 0; y < BAND_LANES && !start; y++) {
+        for (let x = length - 1; x < grid.cols && !start; x++) {
+            const run = Array.from({ length }, (_, i) => ({ x: x - i, y }))
+            if (run.every((c) => free(c, []))) start = run
+        }
+    }
+    if (!start) throw new Error('no free stretch of the band to start the ambient snake on')
+    let cells: Cell[] = start
+    let heading = DIRECTIONS[0]
 
     const pick = (options: Cell[]) => options[Math.floor(random() * options.length)]
 
@@ -113,7 +122,24 @@ export function createAmbientSnake({
                 heading = turn
                 next = at(turn)
             }
-            if (next) cells = [next, ...cells.slice(0, -1)]
+            if (next) {
+                cells = [next, ...cells.slice(0, -1)]
+                return
+            }
+
+            // Dead end (e.g. a blocked cell across both lanes): back out the way we came and circulate the other way.
+            const reversed = [...cells].reverse()
+            const tailDir = reversed.length > 1
+                ? { x: reversed[0].x - reversed[1].x, y: reversed[0].y - reversed[1].y }
+                : { x: -heading.x, y: -heading.y }
+            const rBody = reversed.slice(0, -1)
+            const rAt = (d: Cell): Cell => ({ x: reversed[0].x + d.x, y: reversed[0].y + d.y })
+            const rSideways = DIRECTIONS.filter((d) => d.x * tailDir.x + d.y * tailDir.y === 0)
+            const options = [tailDir, ...rSideways].filter((d) => free(rAt(d), rBody))
+            if (options.length === 0) return
+            const dir = options[0] === tailDir ? tailDir : pick(options)
+            heading = dir
+            cells = [rAt(dir), ...reversed.slice(0, -1)]
         },
     }
 }
