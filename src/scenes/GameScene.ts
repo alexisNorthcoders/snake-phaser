@@ -1,5 +1,5 @@
 import socketManager from '../SocketManager';
-import { Snake, getHighScores, HighScore } from '../Snake';
+import { Snake, getHighScores, getLeaderboard, HighScore } from '../Snake';
 import { Food } from '../Food';
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
@@ -54,6 +54,8 @@ export class GameScene extends Phaser.Scene {
   private colorSwatches: Phaser.GameObjects.GameObject[] = [];
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
+  private leaderboardObjects: Phaser.GameObjects.GameObject[] = [];
+  private leaderboardRefreshButton?: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
@@ -237,7 +239,7 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.createColorSwatches();
-    this.displayTopLocalScores();
+    this.displayLeaderboard();
 
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
@@ -304,6 +306,66 @@ export class GameScene extends Phaser.Scene {
         });
       });
     }
+  }
+
+  private async displayLeaderboard(): Promise<void> {
+    if (this.name === 'anonymous') {
+      this.displayTopLocalScores();
+      return;
+    }
+
+    const leaderboard = await getLeaderboard();
+    const topLeaderboard = leaderboard.slice(0, 10);
+
+    const BOARD_X = 50;
+    let BOARD_Y = 310;
+
+    const header = this.add.text(BOARD_X, BOARD_Y, 'GLOBAL LEADERBOARD', {
+      fontSize: '18px',
+      color: '#ffff00',
+    });
+    this.leaderboardObjects.push(header);
+
+    BOARD_Y += 28;
+
+    if (topLeaderboard.length > 0) {
+      topLeaderboard.forEach((entry, index) => {
+        const text = this.add.text(BOARD_X, BOARD_Y + index * 22, `#${index + 1}: ${entry.username} - ${entry.score}`, {
+          fontSize: '14px',
+          color: '#ffffff',
+        });
+        this.leaderboardObjects.push(text);
+      });
+    } else {
+      const emptyText = this.add.text(BOARD_X, BOARD_Y, 'No scores yet', {
+        fontSize: '14px',
+        color: '#aaaaaa',
+      });
+      this.leaderboardObjects.push(emptyText);
+    }
+
+    BOARD_Y += topLeaderboard.length * 22 + 15;
+    this.leaderboardRefreshButton = this.add.text(BOARD_X, BOARD_Y, 'Refresh Leaderboard', {
+      fontSize: '14px',
+      color: '#00ff00',
+      backgroundColor: '#222',
+      padding: { x: 8, y: 4 },
+    })
+      .setInteractive({ useHandCursor: true })
+      .on('pointerover', () => this.leaderboardRefreshButton?.setStyle({ backgroundColor: '#444' }))
+      .on('pointerout', () => this.leaderboardRefreshButton?.setStyle({ backgroundColor: '#222' }))
+      .on('pointerdown', () => {
+        this.clearLeaderboard();
+        this.displayLeaderboard();
+      });
+
+    this.leaderboardObjects.push(this.leaderboardRefreshButton);
+  }
+
+  private clearLeaderboard(): void {
+    this.leaderboardObjects.forEach((obj) => obj.destroy());
+    this.leaderboardObjects = [];
+    this.leaderboardRefreshButton = undefined;
   }
 
   startGame() {
@@ -532,6 +594,8 @@ export class GameScene extends Phaser.Scene {
     this.gameOverObjects = [];
     this.scoreboardTexts = new Map();
     this.scoreboardVisible = false;
+    this.leaderboardObjects = [];
+    this.leaderboardRefreshButton = undefined;
   }
 
   shutdown() {
@@ -542,6 +606,7 @@ export class GameScene extends Phaser.Scene {
     this.clearSnakesAndFood();
     this.clearGameOverOverlay();
     this.clearScoreboard();
+    this.clearLeaderboard();
     authModalManager.close();
 
     // Remove keyboard listeners

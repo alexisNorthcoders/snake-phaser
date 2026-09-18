@@ -188,3 +188,26 @@ export async function getHighScores(): Promise<HighScore[]> {
         return [];
     }
 }
+
+export async function getLeaderboard(): Promise<HighScore[]> {
+    try {
+        const response = await fetch("/api/leaderboard", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Failed to get leaderboard: ${response.status} ${err}`);
+        }
+
+        const data: HighScore[] | null = await response.json();
+        console.log("✅ Leaderboard: ", data);
+        return data ?? [];
+    } catch (error) {
+        console.error("❌ Error fetching leaderboard: ", error);
+        return [];
+    }
+}
