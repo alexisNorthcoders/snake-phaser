@@ -8,7 +8,7 @@ import { isGuest } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
 import { createAccountAppearanceStore, createAppearanceStore, PALETTE, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
-import { createNameStore, MAX_NAME_LENGTH } from '../nameStore';
+import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 
 interface SnakeColors {
@@ -102,12 +102,23 @@ export class GameScene extends Phaser.Scene {
       text: nameStore.saved(),
     });
     this.add.existing(this.nameField);
-    this.nameField.on('textchange', (field: InputText) => {
-      this.name = nameStore.save(field.text);
-      this.playerNameText.setText(`Player: ${this.name}`);
-      this.welcomeText?.setText(`Welcome ${this.name}!`);
-      socketManager.send({ event: 'updatePlayer', name: this.name });
-    });
+    this.nameField.on('textchange', () => this.applyNameField());
+  }
+
+  // Sync this.name and the visible name texts from the field's current value.
+  private applyNameField(): void {
+    if (!this.nameField) return;
+    this.name = normaliseName(this.nameField.text);
+    this.playerNameText.setText(`Player: ${this.name}`);
+    this.welcomeText?.setText(`Welcome ${this.name}!`);
+  }
+
+  // Persist and send the chosen guest name; called once when the game starts.
+  private commitName(): void {
+    if (!this.guest || !this.nameField) return;
+    this.name = nameStore.save(this.nameField.text);
+    this.playerNameText.setText(`Player: ${this.name}`);
+    socketManager.send({ event: 'updatePlayer', name: this.name });
   }
 
   private destroyNameField(): void {
@@ -369,6 +380,7 @@ export class GameScene extends Phaser.Scene {
 
     this.startButton.on('pointerdown', () => {
       console.log("[GameScene] Start button clicked");
+      this.commitName();
       socketManager.send({ event: 'startGame' });
     });
 
@@ -530,6 +542,7 @@ export class GameScene extends Phaser.Scene {
 
   startGame() {
     console.log("[GameScene] Requesting game start");
+    this.commitName();
     socketManager.send({ event: 'startGame' });
   }
 
