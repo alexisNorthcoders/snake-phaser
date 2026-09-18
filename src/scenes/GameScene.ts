@@ -350,13 +350,13 @@ export class GameScene extends Phaser.Scene {
     const topScores = LocalScoresManager.getTopScores(5);
 
     if (topScores.length > 0) {
-      const SCORES_X = 100;
-      let SCORES_Y = 380;
+      const SCORES_X = 400;
+      let SCORES_Y = 495;
 
       const header = this.add.text(SCORES_X, SCORES_Y, 'YOUR TOP SCORES:', {
         fontSize: '18px',
         color: '#ffff00',
-      });
+      }).setOrigin(0.5, 0);
       this.leaderboardObjects.push(header);
 
       SCORES_Y += 25;
@@ -365,7 +365,7 @@ export class GameScene extends Phaser.Scene {
         const text = this.add.text(SCORES_X, SCORES_Y + index * 20, `#${index + 1}: ${score.score} (${date})`, {
           fontSize: '16px',
           color: '#ffffff',
-        });
+        }).setOrigin(0.5, 0);
         this.leaderboardObjects.push(text);
       });
     }
