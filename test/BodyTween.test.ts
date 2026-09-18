@@ -86,3 +86,30 @@ test('a segment the snake has just grown sits on its cell', () => {
 
   assert.deepEqual(t.positionsAt(1050), [{ x: 5.5, y: 5 }, { x: 4.5, y: 5 }, { x: 5, y: 5 }]);
 });
+
+test('targets exposes the cells the current slide heads for', () => {
+  const t = tween();
+  t.retarget([{ x: 5, y: 5 }, { x: 4, y: 5 }], 0);
+
+  assert.deepEqual(t.targets, [{ x: 5, y: 5 }, { x: 4, y: 5 }]);
+});
+
+test('tailPrevious is the tail cell before this slide, with no previous cell for a grown segment', () => {
+  const t = tween();
+  t.retarget([{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }], 0);
+  t.retarget([{ x: 6, y: 5 }, { x: 5, y: 5 }, { x: 4, y: 5 }], 1000);
+
+  assert.deepEqual(t.tailPrevious, { x: 3, y: 5 });
+
+  t.retarget([{ x: 7, y: 5 }, { x: 6, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 5 }], 2000);
+  assert.deepEqual(t.tailPrevious, { x: 5, y: 5 });
+});
+
+test('snap does not collapse tailPrevious onto the tail\'s own cell', () => {
+  const t = tween();
+  t.retarget([{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }], 0);
+  t.retarget([{ x: 6, y: 5 }, { x: 5, y: 5 }, { x: 4, y: 5 }], 1000);
+  t.snap();
+
+  assert.deepEqual(t.tailPrevious, { x: 3, y: 5 });
+});

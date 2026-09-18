@@ -13,11 +13,12 @@ const quietLog = () => {
   return { lines, log: (...a: unknown[]) => lines.push(a.join(' ')), warn: (...a: unknown[]) => lines.push(a.join(' ')) };
 };
 
-test('with nothing stored, the snake is drawn as blocks at width 0.8', () => {
+test('with nothing stored, the snake is drawn as blocks at width 0.8 and the head follows the curve', () => {
   const feature = createFeatureSettings(new MemoryStorage(), quietLog());
 
   assert.equal(feature.snakeBody, 'blocks');
   assert.equal(feature.snakeBodyWidth, 0.8);
+  assert.equal(feature.snakeHeadFollowsArc, true);
 });
 
 test('assigned settings survive a reload', () => {
@@ -25,10 +26,22 @@ test('assigned settings survive a reload', () => {
   const feature = createFeatureSettings(storage, quietLog());
   feature.snakeBody = 'joints';
   feature.snakeBodyWidth = 1;
+  feature.snakeHeadFollowsArc = false;
 
   const reloaded = createFeatureSettings(storage, quietLog());
   assert.equal(reloaded.snakeBody, 'joints');
   assert.equal(reloaded.snakeBodyWidth, 1);
+  assert.equal(reloaded.snakeHeadFollowsArc, false);
+});
+
+test('a non-boolean snakeHeadFollowsArc warns and resets to true', () => {
+  const out = quietLog();
+  const feature = createFeatureSettings(new MemoryStorage(), out);
+  feature.snakeHeadFollowsArc = false;
+  feature.snakeHeadFollowsArc = 'yes' as never;
+
+  assert.equal(feature.snakeHeadFollowsArc, true);
+  assert.match(out.lines.join('\n'), /snakeHeadFollowsArc/);
 });
 
 test('an unknown body style warns and resets to blocks', () => {
@@ -91,6 +104,7 @@ test('list() prints every setting with its current value and the values it accep
   const printed = out.lines.join('\n');
   assert.match(printed, /feature\.snakeBody = 'blocks'.*'blocks' \| 'joints' \| 'arcs'/);
   assert.match(printed, /feature\.snakeBodyWidth = 0\.6.*0\.5–1/);
+  assert.match(printed, /feature\.snakeHeadFollowsArc = true.*true \| false/);
 });
 
 test('creating the settings prints nothing', () => {

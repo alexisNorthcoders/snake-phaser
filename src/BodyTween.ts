@@ -12,6 +12,9 @@ import type { GridPosition } from './Snake'
 export class BodyTween {
     private from: GridPosition[] = []
     private to: GridPosition[] = []
+    // The tail's cell before its latest retarget, kept apart from `from` since
+    // `snap()` collapses `from` onto `to` and would otherwise erase it.
+    private tailPreviousCell: GridPosition = { x: 0, y: 0 }
     private startedAt = 0
     private tickMs: number
     private boardSize: number
@@ -33,6 +36,15 @@ export class BodyTween {
             if (!start || this.wraps(start, cell)) return cell
             return start
         })
+
+        // A grown tail (one more cell than before) has no previous cell of its
+        // own yet; otherwise it's wherever the tail was heading before this.
+        const oldTail = this.to[this.to.length - 1]
+        this.tailPreviousCell =
+            cells.length > this.to.length || !oldTail
+                ? { x: cells[cells.length - 1].x, y: cells[cells.length - 1].y }
+                : { x: oldTail.x, y: oldTail.y }
+
         this.to = cells.map(({ x, y }) => ({ x, y }))
         this.startedAt = now
     }
@@ -44,7 +56,7 @@ export class BodyTween {
 
     /** Where each segment is drawn at `now`, in grid units. */
     positionsAt(now: number): GridPosition[] {
-        const t = Math.min(1, Math.max(0, (now - this.startedAt) / this.tickMs))
+        const t = this.progressAt(now)
         return this.to.map((end, i) => {
             const start = this.from[i] ?? end
             return {
@@ -52,6 +64,21 @@ export class BodyTween {
                 y: start.y + (end.y - start.y) * t,
             }
         })
+    }
+
+    /** How far through the current tick's slide `now` falls, from 0 to 1. */
+    progressAt(now: number): number {
+        return Math.min(1, Math.max(0, (now - this.startedAt) / this.tickMs))
+    }
+
+    /** The cells this tick's slide is heading for, head first. */
+    get targets(): GridPosition[] {
+        return this.to.map(({ x, y }) => ({ x, y }))
+    }
+
+    /** The cell the tail segment is sliding away from this tick. */
+    get tailPrevious(): GridPosition {
+        return { ...this.tailPreviousCell }
     }
 
     private wraps(a: GridPosition, b: GridPosition): boolean {

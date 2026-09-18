@@ -1,5 +1,6 @@
 import { getRandomColor } from './utils'
 import { BodyTween } from './BodyTween'
+import { arcBodyPath } from './BodyPath'
 import { feature } from './feature'
 
 interface SnakeColorSet {
@@ -74,16 +75,25 @@ export class Snake {
     draw(yOffset: number): void {
         const { graphics, gridSize, colors } = this
 
-        const segments = this.body.positionsAt(performance.now())
-        const [head] = segments
-        const headX = head.x * gridSize
-        const headY = yOffset + head.y * gridSize
+        const now = performance.now()
+        const segments = this.body.positionsAt(now)
 
         graphics.clear()
 
-        // Until the 'arcs' style exists it is drawn as 'joints'.
-        if (feature.snakeBody === 'blocks') this.drawBlocks(segments.slice(1), yOffset)
-        else this.drawJoints(segments, yOffset)
+        let headCell: GridPosition = segments[0]
+
+        if (feature.snakeBody === 'blocks') {
+            this.drawBlocks(segments.slice(1), yOffset)
+        } else if (feature.snakeBody === 'arcs') {
+            const path = arcBodyPath(this.body.targets, this.body.tailPrevious, this.body.progressAt(now))
+            this.drawPath(path, yOffset)
+            if (feature.snakeHeadFollowsArc && path.length > 0) headCell = path[0]
+        } else {
+            this.drawJoints(segments, yOffset)
+        }
+
+        const headX = headCell.x * gridSize
+        const headY = yOffset + headCell.y * gridSize
 
         // Draw head
         const headColor = Phaser.Display.Color.HexStringToColor(colors.head).color
@@ -125,22 +135,45 @@ export class Snake {
 
     /**
      * One continuous body through the segment centres, head included: a thick
-     * line with a circle on every joint to round it. A black pass 2px wider
-     * under a body-coloured pass 2px narrower leaves a single 2px silhouette.
+     * line with a circle on every joint to round it.
      */
     private drawJoints(segments: GridPosition[], yOffset: number): void {
+        const centres = segments.map(({ x, y }) => this.toPixels(x, y, yOffset))
+        this.strokeDoubleLine(centres, { roundJoints: true })
+    }
+
+    /**
+     * The 'arcs' body: `path` is already a smooth poly-line (corners rounded
+     * into quarter-arcs), so it needs no per-point circles — those would blob
+     * a curve that's already round.
+     */
+    private drawPath(path: GridPosition[], yOffset: number): void {
+        const points = path.map(({ x, y }) => this.toPixels(x, y, yOffset))
+        this.strokeDoubleLine(points, { roundJoints: false })
+    }
+
+    private toPixels(x: number, y: number, yOffset: number): { x: number; y: number } {
+        const { gridSize } = this
+        return { x: (x + 0.5) * gridSize, y: yOffset + (y + 0.5) * gridSize }
+    }
+
+    /**
+     * A black pass 2px wider than `snakeBodyWidth` under a body-coloured pass
+     * 2px narrower, leaving a single 2px silhouette. `roundJoints` fills a
+     * circle at every point, for a polyline whose corners are square.
+     */
+    private strokeDoubleLine(points: { x: number; y: number }[], { roundJoints }: { roundJoints: boolean }): void {
         const { graphics, gridSize, colors, transparent } = this
         const width = feature.snakeBodyWidth * gridSize
-        const centres = segments.map(({ x, y }) => ({
-            x: (x + 0.5) * gridSize,
-            y: yOffset + (y + 0.5) * gridSize,
-        }))
+        if (points.length < 2) return
 
         const pass = (color: number, thickness: number) => {
             graphics.lineStyle(thickness, color, transparent)
-            if (centres.length > 1) graphics.strokePoints(centres)
-            graphics.fillStyle(color, transparent)
-            centres.forEach(({ x, y }) => graphics.fillCircle(x, y, thickness / 2))
+            graphics.strokePoints(points)
+            if (roundJoints) {
+                graphics.fillStyle(color, transparent)
+                points.forEach(({ x, y }) => graphics.fillCircle(x, y, thickness / 2))
+            }
         }
 
         pass(0x000000, width + 2)
