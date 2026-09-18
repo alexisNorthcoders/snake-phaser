@@ -291,6 +291,7 @@ class AuthModalManager {
         token,
         username: username,
         userId,
+        isGuest: false,
       }));
 
       // Migrate anonymous scores if any exist

@@ -1,6 +1,7 @@
 import InputText from "phaser3-rex-plugins/plugins/inputtext";
 import { ClientIdManager } from "../utils/clientIdManager";
 import { migrateAnonymousScores } from "../utils/scoreMigrationHelper";
+import { isGuest } from "../userData";
 
 export class LoginScene extends Phaser.Scene {
     private passwordText!: InputText
@@ -150,6 +151,7 @@ export class LoginScene extends Phaser.Scene {
                 token: token,
                 username: username,
                 userId: userId,
+                isGuest: false,
             }));
 
             // Migrate anonymous scores if any exist
@@ -193,6 +195,7 @@ export class LoginScene extends Phaser.Scene {
                 token: data.accessToken,
                 username: `anonymous`,
                 userId: data.userId,
+                isGuest: true,
             }));
             this.startGame();
         } else {
@@ -221,6 +224,8 @@ export class LoginScene extends Phaser.Scene {
                         username: data.user.username,
                         userId: data.userId,
                         expiresIn: data.expiresIn,
+                        // The server only knows the name, so carry the stored session's guest status over
+                        isGuest: isGuest(JSON.parse(localStorage.getItem('userData') || '{}')),
                     };
 
                     localStorage.setItem('userData', JSON.stringify(userData));
