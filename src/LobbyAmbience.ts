@@ -28,18 +28,19 @@ export class LobbyAmbience {
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     const grid = gridFor(scene.scale.width, scene.scale.height);
+    this.snake = createAmbientSnake({
+      grid,
+      random: Math.random,
+      fruit: () => this.fruitField.fruit.map((f) => f.cell),
+      onEat: (cell) => this.fruitField.eat(cell),
+    });
+    // The snake reads the field lazily, so the field can be built once the snake exists.
     this.fruitField = createAmbientFruit({
       grid,
       random: Math.random,
       allowed: (cell) => inBand(grid, cell),
       occupied: () => this.snake.cells,
       kinds: FRUIT_KEYS.length,
-    });
-    this.snake = createAmbientSnake({
-      grid,
-      random: Math.random,
-      fruit: () => this.fruitField.fruit.map((f) => f.cell),
-      onEat: (cell) => this.fruitField.eat(cell),
     });
     this.bodyGraphics = scene.add.graphics().setDepth(AMBIENCE_DEPTH).setAlpha(ALPHA);
     this.graphics = scene.add.graphics().setDepth(AMBIENCE_DEPTH).setAlpha(ALPHA);
