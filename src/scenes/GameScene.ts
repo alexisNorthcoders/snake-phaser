@@ -296,7 +296,8 @@ export class GameScene extends Phaser.Scene {
       });
       this.accountAppearance.load().then((colours) => {
         if (!this.sys.isActive()) return;
-        this.colourSelection?.setColours(colours);
+        // Mutate in place: snakeColors is shared with the selection, and must be updated even if the panel is gone.
+        Object.assign(this.snakeColors, colours);
         this.colourPanel?.setVisible(true);
         this.colourPanel?.refresh();
         this.sendColorUpdate();
