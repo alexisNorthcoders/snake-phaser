@@ -207,19 +207,23 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setScrollFactor(0);
 
-    // Logout button
-    const logoutButton = this.add.text(700, 20, 'Logout', {
+    // Guests get Log In (opens the auth overlay on the login form); accounts get Logout.
+    const headerButton = this.add.text(700, 20, this.guest ? 'Log In' : 'Logout', {
       fontSize: '20px',
-      color: '#ff0000',
+      color: this.guest ? '#00ff00' : '#ff0000',
       backgroundColor: '#222',
       padding: { x: 10, y: 5 },
     })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerover', () => logoutButton.setStyle({ backgroundColor: '#444' }))
-      .on('pointerout', () => logoutButton.setStyle({ backgroundColor: '#222' }))
+      .on('pointerover', () => headerButton.setStyle({ backgroundColor: '#444' }))
+      .on('pointerout', () => headerButton.setStyle({ backgroundColor: '#222' }))
       .on('pointerdown', () => {
-        this.logout();
+        if (this.guest) {
+          this.openLogIn();
+        } else {
+          this.logout();
+        }
       });
 
     const SCOREBOARD_X = 600;
@@ -326,6 +330,22 @@ export class GameScene extends Phaser.Scene {
 
     // Start ping measurement after connection
     socketManager.startPingMeasurement(this);
+  }
+
+  /** Open the auth overlay on the login form; on success restart so the room is rejoined as the account. */
+  private openLogIn() {
+    const authConfig: AuthModalConfig = {
+      playerName: this.name,
+      playerScore: 0,
+      initialForm: 'login',
+      onAuthSuccess: () => {
+        this.destroyLobbyAmbience();
+        socketManager.close();
+        this.scene.restart();
+      },
+      onDismiss: () => {},
+    };
+    authModalManager.open(this, authConfig);
   }
 
   async logout() {
