@@ -72,7 +72,7 @@ export class ColourPanel {
     drawSnake({ graphics: this.graphics, bodyGraphics: this.bodyGraphics }, {
       // Facing right: head first, then the body cell, then the tail cell.
       cells: [{ x: 2, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 }],
-      colors: this.selection.colours,
+      colors: this.selection.displayedColours(),
       cellSize: CELL,
       origin: PREVIEW_ORIGIN,
       bodyStyle: feature.snakeBody === 'blocks' ? 'blocks' : 'joints',
@@ -121,6 +121,14 @@ export class ColourPanel {
       const rect = scene.add.rectangle(x, y, SWATCH, SWATCH, Phaser.Display.Color.HexStringToColor(colour).color)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true });
+      rect.on('pointerover', () => {
+        this.selection.hover(colour);
+        this.refresh();
+      });
+      rect.on('pointerout', () => {
+        this.selection.unhover();
+        this.refresh();
+      });
       rect.on('pointerdown', () => {
         this.selection.pick(colour);
         this.refresh();
