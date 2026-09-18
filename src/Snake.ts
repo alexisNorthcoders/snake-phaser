@@ -17,6 +17,7 @@ export interface GridPosition {
 // The server's gameConfig: 8 ticks a second on a 20-cell board.
 const TICK_MS = 1000 / 8
 const BOARD_CELLS = 20
+const DEAD_ALPHA = 0.35
 
 export class Snake {
     private scene: Phaser.Scene
@@ -97,9 +98,10 @@ export class Snake {
 
         // Draw head
         const headColor = Phaser.Display.Color.HexStringToColor(colors.head).color
-        graphics.fillStyle(headColor, 1)
+        const headAlpha = this.isDead ? DEAD_ALPHA : 1
+        graphics.fillStyle(headColor, headAlpha)
         graphics.fillCircle(headX + gridSize / 2, headY + gridSize / 2, gridSize / 2)
-        graphics.lineStyle(2, 0x000000, 1)
+        graphics.lineStyle(2, 0x000000, headAlpha)
         graphics.strokeCircle(headX + gridSize / 2, headY + gridSize / 2, gridSize / 2)
 
         // Draw eyes
@@ -109,6 +111,14 @@ export class Snake {
         const eyeY = headY
 
         const eyesColor = Phaser.Display.Color.HexStringToColor(colors.eyes).color
+
+        if (this.isDead) {
+            // Full opacity: a black X under an eye-coloured one stays readable on any colour.
+            this.drawXEye(eyeX1, eyeY, eyeSize, eyesColor)
+            this.drawXEye(eyeX2, eyeY, eyeSize, eyesColor)
+            return
+        }
+
         graphics.fillStyle(eyesColor, 1)
         graphics.fillRect(eyeX1, eyeY, eyeSize, eyeSize)
         graphics.fillRect(eyeX2, eyeY, eyeSize, eyeSize)
@@ -117,9 +127,26 @@ export class Snake {
         graphics.strokeRect(eyeX2, eyeY, eyeSize, eyeSize)
     }
 
+    private drawXEye(x: number, y: number, size: number, color: number): void {
+        const { graphics } = this
+        const cross = (thickness: number, lineColor: number) => {
+            graphics.lineStyle(thickness, lineColor, 1)
+            graphics.lineBetween(x, y, x + size, y + size)
+            graphics.lineBetween(x + size, y, x, y + size)
+        }
+        cross(5, 0x000000)
+        cross(3, color)
+    }
+
+    /** Opacity of the body: dead snakes are see-through, live ones use their own transparency. */
+    private get bodyAlpha(): number {
+        return this.isDead ? DEAD_ALPHA : this.transparent
+    }
+
     /** One outlined square per tail cell. */
     private drawBlocks(tail: GridPosition[], yOffset: number): void {
-        const { graphics, gridSize, colors, transparent } = this
+        const { graphics, gridSize, colors } = this
+        const transparent = this.bodyAlpha
         const bodyColor = Phaser.Display.Color.HexStringToColor(colors.body).color
 
         tail.forEach((segment) => {
@@ -163,7 +190,8 @@ export class Snake {
      * circle at every point, for a polyline whose corners are square.
      */
     private strokeDoubleLine(points: { x: number; y: number }[], { roundJoints }: { roundJoints: boolean }): void {
-        const { graphics, gridSize, colors, transparent } = this
+        const { graphics, gridSize, colors } = this
+        const transparent = this.bodyAlpha
         const width = feature.snakeBodyWidth * gridSize
         if (points.length < 2) return
 
@@ -187,9 +215,6 @@ export class Snake {
     async stop(playerId: string, score: number, isAnonymous: boolean): Promise<void> {
         this.isDead = true
         this.snap()
-        this.colors.head = 'black'
-        this.colors.eyes = 'gray'
-        this.colors.body = 'rgb(139, 0, 0)'
 
         await postUserScore(score)
     }
