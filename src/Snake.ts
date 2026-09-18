@@ -21,7 +21,6 @@ export class Snake {
     private graphics: Phaser.GameObjects.Graphics
     private gridSize: number
 
-    public type: string
     public isDead: boolean = false
     public food: number = 0
     public glow: boolean = false
@@ -38,12 +37,10 @@ export class Snake {
         scene: Phaser.Scene,
         x: number = 2,
         y: number = 4,
-        type: string = 'player',
         colors: SnakeColorSet = {},
         size: number = 0
     ) {
         this.scene = scene
-        this.type = type
         this.size = size
         this.body.retarget([{ x, y }], performance.now())
 
@@ -127,10 +124,7 @@ export class Snake {
         this.colors.eyes = 'gray'
         this.colors.body = 'rgb(139, 0, 0)'
 
-        if (this.type === 'player') {
-
-            await postUserScore(score)
-        }
+        await postUserScore(score)
     }
 }
 

@@ -29,7 +29,6 @@ export class SnakeState extends Schema {
     @type("number") score: number = 0;
     @type("number") size: number = 0;
     @type(Coordinates) direction = new Coordinates();
-    @type("string") type: string = "player";
     @type("string") playerId: string = "";
 }
 
@@ -50,7 +49,6 @@ export const tailCells = ({ tail, tailCursor }: SnakeState): { x: number; y: num
 export class Player extends Schema {
     @type("string") id: string = "";
     @type("string") name: string = "";
-    @type("string") type: string = "player";
     @type(SnakeColours) colours = new SnakeColours();
     @type(SnakeState) snake?: SnakeState;
 }

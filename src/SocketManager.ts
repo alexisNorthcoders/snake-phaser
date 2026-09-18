@@ -162,7 +162,6 @@ class SocketManager {
                 scene,
                 player.snake.x,
                 player.snake.y,
-                player.type,
                 player.colours,
                 player.snake.size
               );
