@@ -2,6 +2,7 @@ import socketManager from '../SocketManager';
 import { Snake, getHighScores, HighScore } from '../Snake';
 import { Food } from '../Food';
 import { LocalScoresManager } from '../utils/localScoresManager';
+import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 
 interface SnakeColors {
   head: string;
@@ -347,6 +348,35 @@ export class GameScene extends Phaser.Scene {
       LocalScoresManager.saveScore(playerRanking.score);
     }
 
+    const score = playerRanking?.score ?? 0;
+
+    // Show auth modal for anonymous players
+    if (this.name === 'anonymous') {
+      const authConfig: AuthModalConfig = {
+        playerName: this.name,
+        playerScore: score,
+        onAuthSuccess: () => {
+          // Refresh user data from localStorage after auth
+          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+          this.name = userData.username;
+          this.playerId = String(userData.userId);
+          // Show normal game over screen
+          this.displayGameOverScreen(payload);
+        },
+        onDismiss: () => {
+          // Show normal game over screen for guest continuation
+          this.displayGameOverScreen(payload);
+        },
+      };
+      authModalManager.open(this, authConfig);
+      return;
+    }
+
+    // For authenticated players, show game over screen directly
+    this.displayGameOverScreen(payload);
+  }
+
+  private async displayGameOverScreen(payload: GameOverPayload) {
     const topScores: HighScore[] = (await getHighScores()).slice(0, 3);
 
     const PANEL_CENTER_X = 400;
@@ -512,6 +542,7 @@ export class GameScene extends Phaser.Scene {
     this.clearSnakesAndFood();
     this.clearGameOverOverlay();
     this.clearScoreboard();
+    authModalManager.close();
 
     // Remove keyboard listeners
     this.input.keyboard?.removeAllListeners();
