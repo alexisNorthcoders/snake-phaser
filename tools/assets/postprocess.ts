@@ -10,6 +10,29 @@ export function colourDistance(data: Buffer, offset: number, colour: Rgb): numbe
     return Math.hypot(data[offset] - colour[0], data[offset + 1] - colour[1], data[offset + 2] - colour[2])
 }
 
+/** The background colour: the average of the most common (coarsely bucketed) colour along the image border, so an object touching a corner doesn't get sampled. */
+function dominantBorderColour(data: Buffer, width: number, height: number): Rgb {
+    const buckets = new Map<number, { count: number; sum: Rgb }>()
+    const add = (x: number, y: number) => {
+        const o = (y * width + x) * 4
+        const key = (data[o] >> 5) * 64 + (data[o + 1] >> 5) * 8 + (data[o + 2] >> 5)
+        const b = buckets.get(key) ?? { count: 0, sum: [0, 0, 0] as Rgb }
+        b.count++
+        for (let c = 0; c < 3; c++) b.sum[c] += data[o + c]
+        buckets.set(key, b)
+    }
+    for (let x = 0; x < width; x++) {
+        add(x, 0)
+        add(x, height - 1)
+    }
+    for (let y = 1; y < height - 1; y++) {
+        add(0, y)
+        add(width - 1, y)
+    }
+    const best = [...buckets.values()].reduce((a, b) => (b.count > a.count ? b : a))
+    return [best.sum[0] / best.count, best.sum[1] / best.count, best.sum[2] / best.count]
+}
+
 /** Clears the alpha of background-coloured pixels reachable from the image edges; enclosed ones stay. */
 function clearBackgroundFromEdges(data: Buffer, width: number, height: number, background: Rgb): void {
     const isBackground = (p: number) => colourDistance(data, p * 4, background) <= BACKGROUND_TOLERANCE
@@ -55,7 +78,7 @@ function hardenAlpha(data: Buffer): void {
 
 /**
  * Turns a Pixel Fixer result (an opaque size x size image on the flat background colour) into a sprite:
- * the background colour is sampled from the top-left corner and flood-filled away from the edges only,
+ * the background colour is the dominant border colour and is flood-filled away from the edges only,
  * with no resizing, then alpha is hardened to 0/255.
  */
 export async function removeBackground(fixed: Buffer, size: number): Promise<Buffer> {
@@ -63,7 +86,7 @@ export async function removeBackground(fixed: Buffer, size: number): Promise<Buf
     if (info.width !== size || info.height !== size) {
         throw new Error(`Expected a ${size}x${size} image but got ${info.width}x${info.height}`)
     }
-    clearBackgroundFromEdges(data, info.width, info.height, [data[0], data[1], data[2]])
+    clearBackgroundFromEdges(data, info.width, info.height, dominantBorderColour(data, info.width, info.height))
     hardenAlpha(data)
     return sharp(data, { raw: { width: size, height: size, channels: 4 } }).png().toBuffer()
 }

@@ -49,6 +49,15 @@ test('output alpha is only 0 or 255 and the size is unchanged', async () => {
   for (let i = 3; i < data.length; i += 4) assert.ok(data[i] === 0 || data[i] === 255, `alpha ${data[i]}`)
 })
 
+test('an object touching the corner does not become the background colour', async () => {
+  const raw = await image(32, 32, (x, y) => (inRect(x, y, 0, 0, 10, 10) ? RED : BG))
+  const { at } = await pixels(await removeBackground(raw, 32))
+  assert.deepEqual(at(0, 0), [255, 0, 0, 255])
+  assert.deepEqual(at(5, 5), [255, 0, 0, 255])
+  assert.equal(at(31, 31)[3], 0)
+  assert.equal(at(20, 0)[3], 0)
+})
+
 test('a result that is not the requested size is rejected', async () => {
   await assert.rejects(removeBackground(await image(64, 64, () => BG), 32), /Expected a 32x32 image but got 64x64/)
 })
