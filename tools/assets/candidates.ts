@@ -7,6 +7,11 @@ export function candidateFile(slot: FoodType, index: number): string {
     return `${slot}-${index}.png`
 }
 
+/** Sheet candidates are numbered across every sheet generated so far: `sheet-<n>.png`. */
+export function sheetCandidateFile(index: number): string {
+    return `sheet-${index}.png`
+}
+
 export interface Candidate {
     slot: FoodType
     index: number
@@ -25,7 +30,7 @@ export function resolveSlots(only: readonly string[]): readonly FoodType[] {
 }
 
 /** Self-contained contact sheet; paths are relative to the theme output folder. */
-export function renderContactSheet(themeName: string, candidates: readonly Candidate[]): string {
+export function renderContactSheet(themeName: string, candidates: readonly Candidate[], sheetCandidates: readonly number[] = []): string {
     const sections = FOOD_TYPES.map((slot) => {
         const cells = candidates
             .filter((c) => c.slot === slot)
@@ -38,6 +43,14 @@ export function renderContactSheet(themeName: string, candidates: readonly Candi
         if (cells.length === 0) return ''
         return `<section><h2>${slot}</h2><div class="row">${cells.join('')}</div></section>`
     }).join('\n')
+    const sheetCells = [...sheetCandidates]
+        .sort((a, b) => a - b)
+        .map((index) => {
+            const label = `sheet #${index}`
+            const img = `food/${sheetCandidateFile(index)}`
+            return `<figure><div class="board"><img src="${img}" width="32" height="32" alt="${label} 1x"><img src="${img}" width="128" height="128" alt="${label} 4x"></div><figcaption>${label} · <a href="raw/${sheetCandidateFile(index)}">raw</a></figcaption></figure>`
+        })
+    const sheetSection = sheetCells.length > 0 ? `<section><h2>sheet candidates</h2><div class="row">${sheetCells.join('')}</div></section>` : ''
     return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${themeName} candidates</title>
 <style>
@@ -49,6 +62,7 @@ figure{margin:0}
 a{color:#8cf}
 </style></head><body>
 <h1>${themeName}</h1>
+${sheetSection}
 ${sections}
 </body></html>
 `
