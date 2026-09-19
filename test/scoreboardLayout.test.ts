@@ -43,3 +43,8 @@ test('last row ends inside the padded panel', () => {
   const l = computeScoreboardLayout(4);
   assert.equal(l.rowY(3) + 16 + 12, SCOREBOARD_PANEL.y + l.height);
 });
+
+test('rgb() channels clamp and long names truncate', () => {
+  assert.equal(parseColour('rgb(300, 0, 0)'), 0xff0000);
+  assert.ok(scoreboardRows([player('a', 'x'.repeat(30), 1)], undefined)[0].label.length <= 12);
+});

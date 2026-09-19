@@ -26,6 +26,9 @@ export interface ScoreboardRow {
   headColour: number;
 }
 
+const MAX_NAME_CHARS = 12;
+const truncate = (name: string) => (name.length > MAX_NAME_CHARS ? name.slice(0, MAX_NAME_CHARS - 1) + '…' : name);
+
 /** Highest score first, capped at the visible maximum; the local player is labelled "You". */
 export function scoreboardRows(players: ScoreboardPlayer[], selfId: string | undefined): ScoreboardRow[] {
   return [...players]
@@ -33,12 +36,14 @@ export function scoreboardRows(players: ScoreboardPlayer[], selfId: string | und
     .slice(0, SCOREBOARD_MAX_ROWS)
     .map((p) => ({
       id: p.id,
-      label: p.id === selfId ? 'You' : p.name || 'Player',
+      label: p.id === selfId ? 'You' : truncate(p.name || 'Player'),
       score: p.score,
       isDead: p.isDead,
       headColour: parseColour(p.headColour),
     }));
 }
+
+const c = (v: string) => Math.min(255, Number(v));
 
 /** Accepts "#rrggbb", "#rgb" and "rgb(r, g, b)"; anything else falls back to white. */
 export function parseColour(value: string): number {
@@ -47,14 +52,13 @@ export function parseColour(value: string): number {
   const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(value.trim());
   if (short) return parseInt(short[1] + short[1] + short[2] + short[2] + short[3] + short[3], 16);
   const rgb = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(value.trim());
-  if (rgb) return (Number(rgb[1]) << 16) | (Number(rgb[2]) << 8) | Number(rgb[3]);
+  if (rgb) return (c(rgb[1]) << 16) | (c(rgb[2]) << 8) | c(rgb[3]);
   return 0xffffff;
 }
 
 export interface ScoreboardLayout {
   height: number;
   contentX: number;
-  contentWidth: number;
   headingY: number;
   /** Top of row `i`. */
   rowY: (i: number) => number;
@@ -74,11 +78,10 @@ export function computeScoreboardLayout(rowCount: number): ScoreboardLayout {
   return {
     height: PADDING_Y + HEADING_HEIGHT + (rowCount > 0 ? ROW_GAP + rowsHeight : 0) + PADDING_Y,
     contentX,
-    contentWidth: p.width - 2 * PADDING_X,
     headingY: p.y + PADDING_Y,
     rowY: (i) => rowsTop + i * (ROW_HEIGHT + ROW_GAP),
     swatchX: contentX,
     nameX: contentX + SCOREBOARD_SWATCH_SIZE + 2 * SCOREBOARD_SWATCH_OUTLINE + 8,
-    scoreRight: contentX + p.width - 2 * PADDING_X,
+    scoreRight: p.x + p.width - PADDING_X,
   };
 }
