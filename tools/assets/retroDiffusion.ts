@@ -22,9 +22,11 @@ export interface ImageRequest {
     palette?: string
     /** Square edge length; defaults to NATIVE_SIZE. */
     size?: number
-    /** Candidates per request; defaults to IMAGES_PER_REQUEST. Tile styles cap this at 1. */
+    /** Candidates per request; defaults to IMAGES_PER_REQUEST. */
     numImages?: number
-    /** Seamless on both axes. A tile is opaque, so it also turns background removal off. */
+    /** Key out the flat backdrop; on by default, and off for anything that fills the frame. */
+    removeBg?: boolean
+    /** Seamless on both axes, so the render can be repeated without a seam. */
     tiling?: boolean
 }
 
@@ -68,8 +70,7 @@ function body(req: ImageRequest, extra: Record<string, unknown>) {
         width: size,
         height: size,
         num_images: req.numImages ?? IMAGES_PER_REQUEST,
-        // A seamless tile covers the whole image: removing its background would eat the tile.
-        remove_bg: !req.tiling,
+        remove_bg: req.removeBg ?? true,
         ...(req.tiling ? { tile_x: true, tile_y: true } : {}),
         ...(req.palette ? { input_palette: req.palette } : {}),
         ...extra,

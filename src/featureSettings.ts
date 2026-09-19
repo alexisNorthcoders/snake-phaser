@@ -13,6 +13,8 @@ export interface FeatureSettings {
     lobbyAmbience: boolean
     /** Folder under assets/images/themes that food textures load from. */
     assetTheme: AssetTheme
+    /** How far the background is dimmed behind the board, 0 (untouched) to 1 (black). */
+    backgroundDim: number
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -26,10 +28,12 @@ const BODY_STYLES: SnakeBodyStyle[] = ['blocks', 'joints', 'arcs']
 const ASSET_THEMES: AssetTheme[] = ['classic', 'goblin-treasure']
 const MIN_WIDTH = 0.5
 const MAX_WIDTH = 1
+const MIN_DIM = 0
+const MAX_DIM = 1
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure' }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4 }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -75,6 +79,16 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return DEFAULTS.assetTheme
     }
 
+    const backgroundDim = (value: unknown): number => {
+        if (typeof value !== 'number' || Number.isNaN(value)) {
+            warn(`backgroundDim must be a number, got ${JSON.stringify(value)}; using ${DEFAULTS.backgroundDim}`)
+            return DEFAULTS.backgroundDim
+        }
+        const clamped = Math.min(MAX_DIM, Math.max(MIN_DIM, value))
+        if (clamped !== value) warn(`backgroundDim ${value} is outside ${MIN_DIM}–${MAX_DIM}; clamped to ${clamped}`)
+        return clamped
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
@@ -83,6 +97,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         showFps: 'showFps' in stored ? fpsFlag(stored.showFps) : DEFAULTS.showFps,
         lobbyAmbience: 'lobbyAmbience' in stored ? ambienceFlag(stored.lobbyAmbience) : DEFAULTS.lobbyAmbience,
         assetTheme: 'assetTheme' in stored ? assetTheme(stored.assetTheme) : DEFAULTS.assetTheme,
+        backgroundDim: 'backgroundDim' in stored ? backgroundDim(stored.backgroundDim) : DEFAULTS.backgroundDim,
     }
     const save = () => {
         try {
@@ -132,6 +147,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.assetTheme = assetTheme(theme)
             save()
         },
+        get backgroundDim() { return values.backgroundDim },
+        set backgroundDim(dim) {
+            values.backgroundDim = backgroundDim(dim)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
@@ -141,6 +161,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.showFps = ${values.showFps}    // true | false, live FPS readout under Score`,
                 `  feature.lobbyAmbience = ${values.lobbyAmbience}    // true | false, decorative snake around the lobby edge`,
                 `  feature.assetTheme = '${values.assetTheme}'    // ${ASSET_THEMES.map((theme) => `'${theme}'`).join(' | ')}, folder food textures load from (reload to apply)`,
+                `  feature.backgroundDim = ${values.backgroundDim}    // ${MIN_DIM}–${MAX_DIM}, dims the background behind the board (applies immediately)`,
             ].join('\n'))
         },
     }

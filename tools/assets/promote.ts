@@ -12,8 +12,11 @@ const OUTPUT_ROOT = 'tools/assets/output'
 const PUBLIC_ROOT = 'public'
 
 export interface ManifestEntry {
-    model: string
-    prompt: string
+    /** The model or style that rendered it; absent when the art was supplied by hand. */
+    model?: string
+    prompt?: string
+    /** Where hand-supplied art came from, recorded instead of a model and prompt. */
+    source?: string
     timestamp: string
 }
 
@@ -51,7 +54,7 @@ export function parsePicks(args: readonly string[]): { picks: Picks; background?
         const [, slot, raw] = m
         if (slot === BACKGROUND_PICK) {
             const index = Number(raw)
-            if (!/^\d+$/.test(raw) || index < 1) errors.push(`Invalid pick for background: "${raw}" (tile numbers start at 1)`)
+            if (!/^\d+$/.test(raw) || index < 1) errors.push(`Invalid pick for background: "${raw}" (background numbers start at 1)`)
             else if (background !== undefined) errors.push('Duplicate pick for background')
             else background = index
             continue
@@ -95,7 +98,7 @@ async function isPng(path: string): Promise<boolean> {
 export interface PromoteOptions {
     theme: Theme
     picks: Picks
-    /** Background tile candidate number (`background/tile-<n>.png`); omitted keeps the tile already in the theme. */
+    /** Background candidate number (`background/background-<n>.png`); omitted keeps the one already in the theme. */
     background?: number
     /** Folder holding the processed candidates (`<outputDir>/food/<slot>-<n>.png`). */
     outputDir: string
@@ -115,10 +118,10 @@ export async function promote({ theme, picks, background, outputDir, publicDir, 
     const problems: string[] = []
     if (background !== undefined) {
         if (!(await isPng(`${outputDir}/background/${backgroundCandidateFile(background)}`))) {
-            problems.push(`background: tile ${background} is missing or not a valid PNG in ${outputDir}/background`)
+            problems.push(`background: candidate ${background} is missing or not a valid PNG in ${outputDir}/background`)
         }
     } else if (!(await isPng(`${publicDir}/${backgroundTexturePath(theme.name)}`))) {
-        problems.push('background: no pick given and no valid existing tile in the theme folder')
+        problems.push('background: no pick given and no valid existing image in the theme folder')
     }
     for (const slot of FOOD_TYPES) {
         const index = picks[slot]
@@ -179,7 +182,7 @@ async function main() {
     if (errors.length > 0) throw new Error(errors.join('\n'))
     const theme = await loadTheme(values.theme)
     await promote({ theme, picks, background, outputDir: `${OUTPUT_ROOT}/${theme.name}`, publicDir: PUBLIC_ROOT })
-    const promoted = [`${Object.keys(picks).length} slot(s)`, ...(background === undefined ? [] : [`background tile ${background}`])]
+    const promoted = [`${Object.keys(picks).length} slot(s)`, ...(background === undefined ? [] : [`background ${background}`])]
     console.log(`Promoted ${promoted.join(' and ')} into ${PUBLIC_ROOT}/assets/images/themes/${theme.name}`)
 }
 

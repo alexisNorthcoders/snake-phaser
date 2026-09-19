@@ -8,7 +8,7 @@ import type { Theme } from '../theme.ts'
 export const theme: Theme = {
     name: 'classic',
     background: {
-        description: 'a flat light green grass lawn of short even blades, soft pastel green with a subtle two-tone checker pattern and no objects on it',
+        description: 'short mown grass, bright light green blades in an even carpet, evenly lit and light in tone',
     },
     size: 32,
     food: {

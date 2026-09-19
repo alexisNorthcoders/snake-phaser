@@ -135,14 +135,20 @@ export async function trimToContent(sprite: Buffer, margin = 1): Promise<Buffer>
 }
 
 /**
- * Finishes a background tile: confirms the size and flattens it to fully opaque, so a stray
- * transparent pixel can't punch a hole through the board when the tile repeats.
+ * Builds a board-sized background by repeating one block texture: the block is flattened to fully
+ * opaque first, so no stray transparent pixel shows the canvas through the board, and it is laid
+ * down at 1:1, so every pixel of the render is a pixel of the board. The last row and column are
+ * clipped when the block doesn't divide the board, which a seamless block hides.
  */
-export async function finishTile(raw: Buffer, size: number): Promise<Buffer> {
+export async function composeBackground(raw: Buffer, tileSize: number, boardSize: number): Promise<Buffer> {
     const { data, info } = await sharp(raw).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-    if (info.width !== size || info.height !== size) {
-        throw new Error(`Expected a ${size}x${size} tile but got ${info.width}x${info.height}`)
+    if (info.width !== tileSize || info.height !== tileSize) {
+        throw new Error(`Expected a ${tileSize}x${tileSize} block but got ${info.width}x${info.height}`)
     }
     for (let i = 3; i < data.length; i += 4) data[i] = 255
-    return sharp(data, { raw: { width: size, height: size, channels: 4 } }).png().toBuffer()
+    const block = await sharp(data, { raw: { width: tileSize, height: tileSize, channels: 4 } }).png().toBuffer()
+    return sharp({ create: { width: boardSize, height: boardSize, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } })
+        .composite([{ input: block, tile: true }])
+        .png()
+        .toBuffer()
 }

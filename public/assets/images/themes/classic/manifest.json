@@ -2,8 +2,8 @@
   "theme": "classic",
   "slots": {},
   "background": {
-    "model": "rd_fast__texture",
-    "prompt": "a flat light green grass lawn of short even blades, soft pastel green with a subtle two-tone checker pattern and no objects on it",
-    "timestamp": "2026-09-19T21:10:46.379Z"
+    "model": "rd_fast__mc_texture",
+    "prompt": "short mown grass, bright light green blades in an even carpet, evenly lit and light in tone",
+    "timestamp": "2026-09-19T21:34:25.389Z"
   }
 }

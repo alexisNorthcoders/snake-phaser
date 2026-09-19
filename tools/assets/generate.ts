@@ -1,6 +1,6 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { BACKGROUND_SIZE, DEFAULT_BACKGROUND_STYLE, DEFAULT_PROVIDER, DEFAULT_SHEET_MODEL, isFoodType, type FoodType, type Theme } from './theme.ts'
+import { BACKGROUND_BOARD_SIZE, BACKGROUND_TILE_SIZE, DEFAULT_BACKGROUND_STYLE, DEFAULT_PROVIDER, DEFAULT_SHEET_MODEL, isFoodType, type FoodType, type Theme } from './theme.ts'
 import { loadTheme } from './loadTheme.ts'
 import { CANDIDATES_PER_SLOT, backgroundCandidateFile, candidateFile, renderContactSheet, resolveSlots, sheetCandidateFile, type Candidate } from './candidates.ts'
 import { buildBackgroundPrompt, buildPrompt, buildSheetPrompt } from './prompt.ts'
@@ -8,7 +8,7 @@ import { renderSheet } from './deepinfra.ts'
 import { cutOutObjects } from './cutout.ts'
 import { createPixelFixer } from './pixelFixer.ts'
 import { estimateCost, generateCandidates, loadPalette } from './retroDiffusion.ts'
-import { finishNativeSprite, finishTile, removeBackground, trimToContent } from './postprocess.ts'
+import { composeBackground, finishNativeSprite, removeBackground, trimToContent } from './postprocess.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
 
@@ -18,8 +18,8 @@ async function listCandidates(dir: string): Promise<{ candidates: Candidate[]; s
     const sheetCandidates: number[] = []
     const backgroundCandidates: number[] = []
     for (const file of await readdir(`${dir}/background`)) {
-        const tile = /^tile-(\d+)\.png$/.exec(file)
-        if (tile) backgroundCandidates.push(Number(tile[1]))
+        const background = /^background-(\d+)\.png$/.exec(file)
+        if (background) backgroundCandidates.push(Number(background[1]))
     }
     for (const file of await readdir(`${dir}/food`)) {
         const sheet = /^sheet-(\d+)\.png$/.exec(file)
@@ -57,32 +57,30 @@ async function generateRetroDiffusion(theme: Theme, style: string, slots: readon
     }
 }
 
-/** Next unused tile number, so re-rolling a background keeps the earlier tiles to compare against. */
+/** Next unused background number, so re-rolling keeps the earlier ones to compare against. */
 async function nextBackgroundIndex(dir: string): Promise<number> {
     const { backgroundCandidates } = await listCandidates(dir)
     return Math.max(0, ...backgroundCandidates) + 1
 }
 
-/** Seamless background tiles: one paid request, `tile_x`/`tile_y` on, background removal off. */
+/** One seamless block per candidate, repeated into a board-sized background; it fills the frame, so background removal is off. */
 async function generateBackground(theme: Theme, dir: string) {
     const apiKey = process.env.RETRO_DIFFUSION_API_KEY
     const palette = theme.palette ? await loadPalette(theme.palette) : undefined
     const style = theme.background.style ?? DEFAULT_BACKGROUND_STYLE
-    // `rd_tile__*` styles render one image per request; everything else takes the usual batch.
-    const numImages = style.startsWith('rd_tile__') ? 1 : undefined
-    const request = { prompt: buildBackgroundPrompt(theme), style, palette, size: BACKGROUND_SIZE, tiling: true, numImages }
+    const request = { prompt: buildBackgroundPrompt(theme), style, palette, size: BACKGROUND_TILE_SIZE, removeBg: false, tiling: true }
 
     const { cost, remainingBalance } = await estimateCost([request], { apiKey })
     console.log(`Cost check (free): $${cost.toFixed(3)} for 1 background request; remaining balance $${remainingBalance.toFixed(2)}`)
 
-    console.log(`Generating seamless ${BACKGROUND_SIZE}x${BACKGROUND_SIZE} background tiles with ${style}...`)
+    console.log(`Generating seamless ${BACKGROUND_TILE_SIZE}px blocks with ${style}, repeated into ${BACKGROUND_BOARD_SIZE}px backgrounds...`)
     const images = await generateCandidates(request, { apiKey })
     let index = await nextBackgroundIndex(dir)
     for (const raw of images) {
         const file = backgroundCandidateFile(index)
         await writeFile(`${dir}/raw/${file}`, raw)
-        await writeFile(`${dir}/background/${file}`, await finishTile(raw, BACKGROUND_SIZE))
-        console.log(`  tile #${index}`)
+        await writeFile(`${dir}/background/${file}`, await composeBackground(raw, BACKGROUND_TILE_SIZE, BACKGROUND_BOARD_SIZE))
+        console.log(`  background #${index}`)
         index++
     }
 }
@@ -121,7 +119,7 @@ async function main() {
     })
     if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--background | [--only <foodType>[,<foodType>...]]...] (repeat --only or comma-separate)')
     if (values.background && values.only?.length) {
-        throw new Error('--background generates the theme background tile, so it cannot be combined with --only.')
+        throw new Error('--background generates the theme background, so it cannot be combined with --only.')
     }
     if (positionals.length > 0) {
         throw new Error(`Unexpected argument(s): ${positionals.join(' ')}. Use --only a --only b or --only a,b`)

@@ -38,8 +38,7 @@
     }
   },
   "background": {
-    "model": "rd_fast__texture",
-    "prompt": "a dark goblin cave floor of rough uneven flagstones, cracked grey-green stone with patches of damp moss in the gaps and scattered grit",
-    "timestamp": "2026-09-19T21:10:46.112Z"
+    "source": "hand-supplied art: tools/assets/themes/goblin-treasure.background.png (384x384), scaled to 800x800",
+    "timestamp": "2026-09-19T21:54:59.860Z"
   }
 }

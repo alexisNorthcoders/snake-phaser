@@ -7,7 +7,7 @@ import { BACKGROUND_TEXTURE, backgroundTexturePath } from '../backgroundTexture'
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
 import { ColourPanel } from '../ColourPanel';
-import { LobbyAmbience, BACKGROUND_DEPTH } from '../LobbyAmbience';
+import { LobbyAmbience, BACKGROUND_DEPTH, BACKGROUND_DIM_DEPTH } from '../LobbyAmbience';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
 import { isGuest, sessionName } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
@@ -62,7 +62,8 @@ export class GameScene extends Phaser.Scene {
   public gameConfigured: boolean = false
   public snakes: Map<string, Snake> = new Map();
   public food: Array<Food> = [];
-  public bg!: Phaser.GameObjects.TileSprite;
+  public bg!: Phaser.GameObjects.Image;
+  private bgDim!: Phaser.GameObjects.Rectangle;
 
   public snakeColors: SnakeColors = {
     head: '#00FF00',
@@ -241,13 +242,18 @@ export class GameScene extends Phaser.Scene {
 
   create() {
 
-    this.bg = this.add.tileSprite(
-      0,
-      0,
-      this.scale.width,
-      this.scale.height,
-      BACKGROUND_TEXTURE
-    ).setOrigin(0, 0).setDepth(BACKGROUND_DEPTH);
+    // One image over the whole canvas, header included: the header strip is translucent black,
+    // so it reads as a darkened band of the background rather than a gap above it.
+    this.bg = this.add.image(0, 0, BACKGROUND_TEXTURE)
+      .setOrigin(0, 0)
+      .setDisplaySize(this.scale.width, this.scale.height)
+      .setDepth(BACKGROUND_DEPTH);
+
+    // A detailed background competes with the food and snake drawn on it, so it is pushed back
+    // behind its own scrim rather than being redrawn: only what is under this depth is dimmed.
+    this.bgDim = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000, feature.backgroundDim)
+      .setOrigin(0, 0)
+      .setDepth(BACKGROUND_DIM_DEPTH);
 
     this.add.rectangle(0, 0, this.scale.width, HEADER.height, 0x000000, 0.6).setOrigin(0);
     this.add.rectangle(0, HEADER.height, this.scale.width, HEADER.ruleHeight, 0x000000, 1).setOrigin(0);
@@ -727,6 +733,8 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.updateFps(delta);
+    // Re-read every frame so `feature.backgroundDim = x` in the console lands without a reload.
+    if (this.bgDim && this.bgDim.alpha !== feature.backgroundDim) this.bgDim.setAlpha(feature.backgroundDim);
     if (!this.gameStarted) {
       return;
     }
