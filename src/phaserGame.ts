@@ -1,9 +1,22 @@
 import { Game, AUTO } from 'phaser';
 import { LoginScene } from './scenes/LoginScene';
 import { GameScene } from './scenes/GameScene';
+import { loadGameFont, withDefaultFont } from './font';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext.js';
 
-export function launchGame() {
+// Phaser has no global text-style default (it hardcodes Courier), so default it at the factory.
+function applyDefaultFont() {
+  const factory = Phaser.GameObjects.GameObjectFactory.prototype;
+  const text = factory.text;
+  factory.text = function (this: Phaser.GameObjects.GameObjectFactory, x, y, str, style) {
+    return text.call(this, x, y, str, withDefaultFont(style));
+  };
+}
+
+export async function launchGame() {
+  await loadGameFont();
+  applyDefaultFont();
+
   const MAX_WIDTH = 800;
   const MAX_HEIGHT = 840;
 
