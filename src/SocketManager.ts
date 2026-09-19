@@ -53,7 +53,13 @@ class SocketManager {
         scene.onReconnected?.();
       }
 
-      this.room.onLeave((code) => this.handleLeave(code));
+      // Leave events are ignored unless they come from the current room: close() leaves asynchronously, so the old
+      // room's onLeave can fire after a new connect() has begun, and must not be mistaken for a dropped connection.
+      const joinedRoom = this.room;
+      joinedRoom.onLeave((code) => {
+        if (joinedRoom !== this.room) return;
+        this.handleLeave(code);
+      });
 
       // Set up all message handlers during connection
       this.room.onMessage(SocketManager.messageTypes.GAME_STARTED, () => {
