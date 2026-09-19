@@ -32,7 +32,7 @@ export class PixelButton {
   private readonly width: number;
   private readonly height: number;
   private readonly size: ButtonSize;
-  private readonly fill: ButtonFill;
+  private fill: ButtonFill;
   private hovered = false;
   private pressed = false;
 
@@ -71,6 +71,12 @@ export class PixelButton {
 
   setPressed(pressed: boolean): this {
     this.pressed = pressed;
+    this.redraw();
+    return this;
+  }
+
+  setFill(fill: ButtonFill): this {
+    this.fill = fill;
     this.redraw();
     return this;
   }

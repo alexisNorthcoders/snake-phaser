@@ -197,11 +197,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createColourPanel(): void {
+    const layout = computeLobbyPanelLayout(this.guest);
     const selection = createColourSelection(this.snakeColors);
     // Share the selection's colours object so the socket and saves always see the committed colours.
     this.snakeColors = selection.colours;
     this.colourSelection = selection;
-    this.colourPanel = new ColourPanel(this, selection, () => {
+    this.colourPanel = new ColourPanel(this, layout.contentX, layout.colourSpaceY, selection, () => {
       this.saveColours();
       this.sendColorUpdate();
     });
