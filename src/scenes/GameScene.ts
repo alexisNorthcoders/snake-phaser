@@ -335,17 +335,34 @@ export class GameScene extends Phaser.Scene {
   /** Open the auth overlay on the login form; on success restart so the room is rejoined as the account. */
   private openLogIn() {
     const authConfig: AuthModalConfig = {
-      playerName: this.name,
-      playerScore: 0,
       initialForm: 'login',
-      onAuthSuccess: () => {
-        this.destroyLobbyAmbience();
-        socketManager.close();
-        this.scene.restart();
-      },
+      onAuthSuccess: () => this.restartAsAccount(),
       onDismiss: () => {},
     };
     authModalManager.open(this, authConfig);
+  }
+
+  /** Open the auth overlay on Create Account from the Game Over panel; Back leaves the panel as it was. */
+  private openSaveScore() {
+    authModalManager.open(this, {
+      initialForm: 'register',
+      title: 'SAVE YOUR SCORE',
+      subtitle: 'Create an account to keep your scores',
+      onAuthSuccess: () => this.restartAsAccount(),
+      onDismiss: () => {},
+    });
+  }
+
+  private restartAsAccount() {
+    // The auth overlay has just stored the account in localStorage; refresh identity before restarting.
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    this.guest = isGuest(userData);
+    this.name = sessionName(userData, nameStore);
+    this.playerId = String(userData.userId);
+
+    this.destroyLobbyAmbience();
+    socketManager.close();
+    this.scene.restart();
   }
 
   async logout() {
@@ -534,33 +551,6 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    const score = playerRanking?.score ?? 0;
-
-    // Show auth modal for anonymous players
-    if (this.guest) {
-      const authConfig: AuthModalConfig = {
-        playerName: this.name,
-        playerScore: score,
-        onAuthSuccess: () => {
-          // Refresh user data from localStorage after auth
-          const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-          this.name = sessionName(userData, nameStore);
-          this.guest = isGuest(userData);
-          this.playerNameText.setText(`Player: ${this.name}`);
-          this.playerId = String(userData.userId);
-          // Show normal game over screen
-          this.displayGameOverScreen(payload);
-        },
-        onDismiss: () => {
-          // Show normal game over screen for guest continuation
-          this.displayGameOverScreen(payload);
-        },
-      };
-      authModalManager.open(this, authConfig);
-      return;
-    }
-
-    // For authenticated players, show game over screen directly
     this.displayGameOverScreen(payload);
   }
 
@@ -573,6 +563,7 @@ export class GameScene extends Phaser.Scene {
     const ROW_HEIGHT = 28;
     const SECTION_GAP = 20;
     const BUTTON_GAP = 30;
+    const SAVE_SCORE_GAP = 50;
     const PANEL_TOP_PADDING = 30;
     const PANEL_BOTTOM_PADDING = 40;
     const PANEL_WIDTH = 360;
@@ -587,9 +578,10 @@ export class GameScene extends Phaser.Scene {
     const rowCount = Math.max(topScores.length, 1);
     const topScoresEndY = topScoresStartY + (rowCount - 1) * ROW_HEIGHT;
     const playAgainY = topScoresEndY + ROW_HEIGHT + BUTTON_GAP;
+    const saveScoreY = playAgainY + SAVE_SCORE_GAP;
 
     const panelTopY = TITLE_Y - PANEL_TOP_PADDING;
-    const panelBottomY = playAgainY + PANEL_BOTTOM_PADDING;
+    const panelBottomY = (this.guest ? saveScoreY : playAgainY) + PANEL_BOTTOM_PADDING;
     const panelCenterY = (panelTopY + panelBottomY) / 2;
 
     const panel = this.add.rectangle(PANEL_CENTER_X, panelCenterY, PANEL_WIDTH, panelBottomY - panelTopY, 0x000000, 0.8).setOrigin(0.5).setDepth(20);
@@ -650,6 +642,23 @@ export class GameScene extends Phaser.Scene {
       });
 
     this.gameOverObjects.push(playAgainButton);
+
+    if (this.guest) {
+      const saveScoreButton = this.add.text(PANEL_CENTER_X, saveScoreY, 'SAVE SCORE', {
+        fontSize: '24px',
+        backgroundColor: '#555555',
+        color: '#FFFFFF',
+        padding: { x: 10, y: 5 },
+      })
+        .setOrigin(0.5)
+        .setDepth(20)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerover', () => saveScoreButton.setStyle({ backgroundColor: '#777777' }))
+        .on('pointerout', () => saveScoreButton.setStyle({ backgroundColor: '#555555' }))
+        .on('pointerdown', () => this.openSaveScore());
+
+      this.gameOverObjects.push(saveScoreButton);
+    }
   }
 
   private clearGameOverOverlay() {

@@ -2,10 +2,12 @@ import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { migrateAnonymousScores } from './scoreMigrationHelper';
 
 export interface AuthModalConfig {
-  playerName: string;
-  playerScore: number;
-  /** Skip the "save this score" prompt and open straight on this form. Back then just closes. */
-  initialForm?: 'login' | 'register';
+  /** Form the overlay opens on. Back closes the overlay. */
+  initialForm: 'login' | 'register';
+  /** Replaces the form's default heading (e.g. "SAVE YOUR SCORE"). */
+  title?: string;
+  /** One-line hint shown under the heading. */
+  subtitle?: string;
   onAuthSuccess: () => void;
   onDismiss: () => void;
 }
@@ -35,103 +37,19 @@ class AuthModalManager {
     this.state.isOpen = true;
     this.state.scene = scene;
     this.state.objects = [];
-    this.isRegistering = false;
     this.currentConfig = config;
-
-    if (config.initialForm) {
-      this.isRegistering = config.initialForm === 'register';
-      this.showAuthForm(config);
-      return;
-    }
-    this.createInitialPrompt(config);
-  }
-
-  private createInitialPrompt(config: AuthModalConfig) {
-    const { playerName, playerScore, onAuthSuccess, onDismiss } = config;
-    const scene = this.state.scene;
-
-    const PANEL_CENTER_X = 400;
-    const PANEL_WIDTH = 360;
-    const PANEL_TOP_Y = 180;
-    const PANEL_BOTTOM_Y = 520;
-    const panelCenterY = (PANEL_TOP_Y + PANEL_BOTTOM_Y) / 2;
-
-    const panel = scene.add.rectangle(PANEL_CENTER_X, panelCenterY, PANEL_WIDTH, PANEL_BOTTOM_Y - PANEL_TOP_Y, 0x000000, 0.9)
-      .setOrigin(0.5)
-      .setDepth(30);
-    this.state.objects.push(panel);
-
-    const title = scene.add.text(PANEL_CENTER_X, 200, 'SAVE THIS SCORE FOREVER?', {
-      fontSize: '22px',
-      color: '#ffff00',
-      wordWrap: { width: 320, useAdvancedWrap: true },
-    })
-      .setOrigin(0.5)
-      .setDepth(30);
-    this.state.objects.push(title);
-
-    const scoreText = scene.add.text(PANEL_CENTER_X, 260, `Your Score: ${playerScore}`, {
-      fontSize: '28px',
-      color: '#00ff00',
-    })
-      .setOrigin(0.5)
-      .setDepth(30);
-    this.state.objects.push(scoreText);
-
-    const playerNameText = scene.add.text(PANEL_CENTER_X, 310, `Player: ${playerName}`, {
-      fontSize: '18px',
-      color: '#cccccc',
-    })
-      .setOrigin(0.5)
-      .setDepth(30);
-    this.state.objects.push(playerNameText);
-
-    const guestButton = scene.add.text(PANEL_CENTER_X, 435, 'Play as Guest', {
-      fontSize: '18px',
-      backgroundColor: '#555',
-      color: '#ffffff',
-      padding: { x: 10, y: 5 },
-      fixedWidth: 260,
-      align: 'center',
-    })
-      .setOrigin(0.5)
-      .setDepth(30)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerover', () => guestButton.setStyle({ backgroundColor: '#777' }))
-      .on('pointerout', () => guestButton.setStyle({ backgroundColor: '#555' }))
-      .on('pointerdown', () => {
-        this.close();
-        onDismiss();
-      });
-    this.state.objects.push(guestButton);
-
-    const authButton = scene.add.text(PANEL_CENTER_X, 380, 'Create Account / Log In', {
-      fontSize: '18px',
-      backgroundColor: '#00aa00',
-      color: '#ffffff',
-      padding: { x: 10, y: 5 },
-      fixedWidth: 260,
-      align: 'center',
-    })
-      .setOrigin(0.5)
-      .setDepth(30)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerover', () => authButton.setStyle({ backgroundColor: '#00cc00' }))
-      .on('pointerout', () => authButton.setStyle({ backgroundColor: '#00aa00' }))
-      .on('pointerdown', () => {
-        this.showAuthForm(config);
-      });
-    this.state.objects.push(authButton);
+    this.isRegistering = config.initialForm === 'register';
+    this.showAuthForm(config);
   }
 
   private showAuthForm(config?: AuthModalConfig) {
     const cfg = config || this.currentConfig;
     if (!cfg) return;
 
-    const { onAuthSuccess, onDismiss } = cfg;
+    const { onDismiss } = cfg;
     const scene = this.state.scene;
 
-    // Clear initial prompt
+    // Clear the previous form (when toggling login/register)
     this.state.objects.forEach(obj => obj.destroy());
     this.state.objects = [];
 
@@ -146,13 +64,25 @@ class AuthModalManager {
       .setDepth(30);
     this.state.objects.push(panel);
 
-    const title = scene.add.text(PANEL_CENTER_X, 170, this.isRegistering ? 'CREATE ACCOUNT' : 'LOGIN', {
+    const title = scene.add.text(PANEL_CENTER_X, 170, cfg.title ?? (this.isRegistering ? 'CREATE ACCOUNT' : 'LOGIN'), {
       fontSize: '24px',
       color: '#00ff00',
     })
       .setOrigin(0.5)
       .setDepth(30);
     this.state.objects.push(title);
+
+    if (cfg.subtitle) {
+      const subtitle = scene.add.text(PANEL_CENTER_X, 198, cfg.subtitle, {
+        fontSize: '14px',
+        color: '#cccccc',
+        wordWrap: { width: 320 },
+        align: 'center',
+      })
+        .setOrigin(0.5)
+        .setDepth(30);
+      this.state.objects.push(subtitle);
+    }
 
     scene.add.text(100, 220, 'Username:', { fontSize: '18px', color: '#fff' }).setDepth(30);
     this.state.objects.push(scene.children.list[scene.children.list.length - 1]);
@@ -226,13 +156,8 @@ class AuthModalManager {
       .setDepth(30)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
-        this.isRegistering = false;
         this.close();
-        if (cfg.initialForm) {
-          onDismiss();
-        } else {
-          this.open(scene, cfg);
-        }
+        onDismiss();
       });
     this.state.objects.push(backButton);
 
