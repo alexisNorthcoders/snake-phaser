@@ -12,15 +12,19 @@ export interface PanelRect {
 
 /**
  * Rects for a framed panel of the given outer size, in draw order, relative to its top-left:
- * a black drop shadow below, the black outline, the scrim fill, then a 4px #333333 inner border.
+ * a 4px black drop shadow strictly below the box, the 4px black outline ring on the outer edge,
+ * the scrim fill, then a 4px #333333 inner border. The outer size is width x height; only the shadow extends past it.
  */
 export function computeFrameRects(width: number, height: number, scrimAlpha: number): PanelRect[] {
   const e = PANEL_EDGE;
   const iw = width - 2 * e;
   const ih = height - 2 * e;
   return [
-    { x: 0, y: e, w: width, h: height, color: 0x000000, alpha: 1 },
-    { x: 0, y: 0, w: width, h: height, color: 0x000000, alpha: 1 },
+    { x: 0, y: height, w: width, h: e, color: 0x000000, alpha: 1 },
+    { x: 0, y: 0, w: width, h: e, color: 0x000000, alpha: 1 },
+    { x: 0, y: height - e, w: width, h: e, color: 0x000000, alpha: 1 },
+    { x: 0, y: e, w: e, h: ih, color: 0x000000, alpha: 1 },
+    { x: width - e, y: e, w: e, h: ih, color: 0x000000, alpha: 1 },
     { x: e, y: e, w: iw, h: ih, color: 0x000000, alpha: scrimAlpha },
     { x: e, y: e, w: iw, h: e, color: PANEL_BORDER, alpha: 1 },
     { x: e, y: height - 2 * e, w: iw, h: e, color: PANEL_BORDER, alpha: 1 },

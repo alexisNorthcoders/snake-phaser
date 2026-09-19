@@ -138,6 +138,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The framed lobby panel: title, divider and Start button; the Name row is added for guests. */
   private createLobbyPanel(): void {
+    this.destroyLobbyPanel();
     const p = LOBBY_PANEL;
     const layout = computeLobbyPanelLayout(this.guest);
     this.lobbyPanel = new FramedPanel(this, p.x, p.y, p.width, p.height, p.scrimAlpha);
