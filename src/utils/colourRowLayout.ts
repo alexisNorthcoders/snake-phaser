@@ -6,7 +6,7 @@ export const ROW_GAP = 16;
 export const PART_BUTTON = { width: 80, gap: 12 } as const;
 export const SWATCH = { size: 28, gap: 6, cols: 6, rows: 2 } as const;
 export const SWATCH_GRID_HEIGHT = SWATCH.rows * SWATCH.size + (SWATCH.rows - 1) * SWATCH.gap;
-/** Fills the rest of the 124px box height so both columns line up. */
+/** Button row height: what is left of the row (the preview box height) after the gap and swatch grid, so the right column is exactly as tall as the box. */
 export const PART_BUTTON_HEIGHT = PREVIEW_BOX.height - ROW_GAP - SWATCH_GRID_HEIGHT;
 
 export interface Point {

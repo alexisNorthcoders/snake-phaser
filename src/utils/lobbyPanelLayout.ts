@@ -1,3 +1,5 @@
+import { PREVIEW_BOX } from './colourRowLayout';
+
 export const LOBBY_PANEL = { x: 120, y: 80, width: 560, height: 480, padding: 32, gap: 24, scrimAlpha: 0.9 } as const;
 
 export const TITLE_HEIGHT = 40;
@@ -5,7 +7,7 @@ export const DIVIDER_HEIGHT = 4;
 export const NAME_ROW_HEIGHT = 44;
 export const START_BUTTON = { width: 200, height: 56 } as const;
 /** Height of the colour row: the preview box, which the buttons and swatches match. */
-export const COLOUR_SPACE_HEIGHT = 124;
+export const COLOUR_SPACE_HEIGHT: number = PREVIEW_BOX.height;
 
 export interface LobbyPanelLayout {
   contentX: number;
