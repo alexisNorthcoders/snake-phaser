@@ -4,6 +4,7 @@ export const theme: Theme = {
     name: 'goblin-treasure',
     provider: { kind: 'retro-diffusion', style: 'rd_fast__mc_item' },
     background: 'plain white',
+    palette: 'tools/assets/themes/goblin-treasure.palette.png',
     size: 32,
     food: {
         redApple: 'a single tarnished copper coin, thick round disc with a crude goblin face stamped on it, worn dull orange-brown metal with a bright highlight on the upper-left rim',

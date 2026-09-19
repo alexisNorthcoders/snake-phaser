@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { estimateCost, generateCandidates } from '../../tools/assets/retroDiffusion.ts'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { estimateCost, generateCandidates, loadPalette } from '../../tools/assets/retroDiffusion.ts'
 
 interface Call { url: string; method: string; headers: Record<string, string>; body: any }
 
@@ -112,4 +115,34 @@ test('a 2xx submission without a task_id recovers instead of resubmitting', asyn
 test('cost check fails clearly on HTTP errors and missing balance fields', async () => {
   await assert.rejects(estimateCost([req], { apiKey: 'k', fetchFn: fakeFetch([[401, { detail: 'bad token' }]]).fetchFn }), /HTTP 401.*bad token/)
   await assert.rejects(estimateCost([req], { apiKey: 'k', fetchFn: fakeFetch([[200, { balance_cost: 0.02 }]]).fetchFn }), /no usable balance_cost/)
+})
+
+test('input_palette is sent on the cost check and the paid request when a palette is set, and omitted otherwise', async () => {
+  const withPalette = { ...req, palette: 'UEFMRVRURQ==' }
+  const paid = fakeFetch([[202, { task_id: 't1' }], [200, { status: 'succeeded', result: { base64_images: [png('a')] } }]])
+  await generateCandidates(withPalette, { ...opts, fetchFn: paid.fetchFn })
+  assert.equal(paid.calls[0].body.input_palette, 'UEFMRVRURQ==')
+
+  const cost = fakeFetch([[200, { balance_cost: 0.02, remaining_balance: 10 }]])
+  await estimateCost([withPalette], { apiKey: 'k', fetchFn: cost.fetchFn })
+  assert.equal(cost.calls[0].body.input_palette, 'UEFMRVRURQ==')
+
+  const plain = fakeFetch([[202, { task_id: 't1' }], [200, { status: 'succeeded', result: { base64_images: [png('a')] } }]])
+  await generateCandidates(req, { ...opts, fetchFn: plain.fetchFn })
+  assert.ok(!('input_palette' in plain.calls[0].body))
+})
+
+test('loadPalette returns raw base64 without a data: prefix', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'palette-'))
+  const file = join(dir, 'p.png')
+  await writeFile(file, Buffer.from('PNGDATA'))
+  assert.equal(await loadPalette(file), Buffer.from('PNGDATA').toString('base64'))
+})
+
+test('a missing or empty palette file fails with a clear message', async () => {
+  await assert.rejects(loadPalette('/nonexistent/palette.png'), /Could not read palette image "\/nonexistent\/palette.png"/)
+  const dir = await mkdtemp(join(tmpdir(), 'palette-'))
+  const file = join(dir, 'empty.png')
+  await writeFile(file, '')
+  await assert.rejects(loadPalette(file), /is empty/)
 })

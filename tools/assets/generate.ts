@@ -4,7 +4,7 @@ import { DEFAULT_PROVIDER, isFoodType } from './theme.ts'
 import { loadTheme } from './loadTheme.ts'
 import { CANDIDATES_PER_SLOT, candidateFile, renderContactSheet, resolveSlots, type Candidate } from './candidates.ts'
 import { buildPrompt } from './prompt.ts'
-import { estimateCost, generateCandidates } from './retroDiffusion.ts'
+import { estimateCost, generateCandidates, loadPalette } from './retroDiffusion.ts'
 import { finishNativeSprite } from './postprocess.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
@@ -48,15 +48,17 @@ async function main() {
 
     const provider = theme.provider ?? DEFAULT_PROVIDER
     const apiKey = process.env.RETRO_DIFFUSION_API_KEY
-    const requests = slots.map((slot) => ({ slot, prompt: buildPrompt(theme, slot), style: provider.style }))
+    // Read the palette first so a bad path fails before the cost check or any paid request.
+    const palette = theme.palette ? await loadPalette(theme.palette) : undefined
+    const requests = slots.map((slot) => ({ slot, prompt: buildPrompt(theme, slot), style: provider.style, palette }))
 
     const { cost, remainingBalance } = await estimateCost(requests, { apiKey })
     console.log(`Cost check (free): $${cost.toFixed(3)} for ${requests.length} slot(s); remaining balance $${remainingBalance.toFixed(2)}`)
 
     // Sequential on purpose: a lost submission is recovered from the newest task, which is only unambiguous one at a time.
-    for (const { slot, prompt, style } of requests) {
+    for (const { slot, prompt, style, palette } of requests) {
         console.log(`Generating ${CANDIDATES_PER_SLOT} candidates for ${slot} with ${style}...`)
-        const images = await generateCandidates({ prompt, style }, { apiKey })
+        const images = await generateCandidates({ prompt, style, palette }, { apiKey })
         if (images.length < CANDIDATES_PER_SLOT) {
             throw new Error(`Expected ${CANDIDATES_PER_SLOT} candidates for ${slot} but got ${images.length}`)
         }

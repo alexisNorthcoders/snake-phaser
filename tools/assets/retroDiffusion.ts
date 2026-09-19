@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+
 export const RETRO_DIFFUSION_API = 'https://api.retrodiffusion.ai/v2'
 export const NATIVE_SIZE = 32
 export const IMAGES_PER_REQUEST = 4
@@ -16,6 +18,8 @@ export interface RetroDiffusionOptions {
 export interface ImageRequest {
     prompt: string
     style: string
+    /** Raw base64 palette image (no `data:` prefix), sent as `input_palette`. */
+    palette?: string
 }
 
 export interface CostEstimate {
@@ -38,6 +42,18 @@ function requireKey(apiKey: string | undefined): string {
     return apiKey.trim()
 }
 
+/** Reads a theme's palette image as the raw base64 Retro Diffusion expects; fails before any request if it can't. */
+export async function loadPalette(path: string): Promise<string> {
+    let data: Buffer
+    try {
+        data = await readFile(path)
+    } catch (err) {
+        throw new Error(`Could not read palette image "${path}": ${(err as Error).message}`)
+    }
+    if (data.length === 0) throw new Error(`Palette image "${path}" is empty.`)
+    return data.toString('base64')
+}
+
 function body(req: ImageRequest, extra: Record<string, unknown>) {
     return {
         prompt: req.prompt,
@@ -46,6 +62,7 @@ function body(req: ImageRequest, extra: Record<string, unknown>) {
         height: NATIVE_SIZE,
         num_images: IMAGES_PER_REQUEST,
         remove_bg: true,
+        ...(req.palette ? { input_palette: req.palette } : {}),
         ...extra,
     }
 }
