@@ -2,34 +2,38 @@ import { PALETTE } from './appearanceStore';
 import type { ColourSelection, Part } from './colourSelection';
 import { drawSnake } from './SnakeDrawing';
 import { feature } from './feature';
-
-const CELL = 44;
-const PREVIEW_ORIGIN = { x: 400 - CELL * 1.5, y: 160 };
-const BUTTONS_Y = 245;
-const SWATCH = 28;
-const GAP = 6;
-const COLS = 6;
-const PALETTE_TOP = 272;
+import { PixelButton } from './PixelButton';
+import {
+  PART_BUTTON, PART_BUTTON_HEIGHT, PREVIEW_CELL as CELL, SWATCH,
+  computeColourRowLayout, computePreviewBoxRects, computeSwatchEdgeRects, swatchPosition,
+  type BoxRect, type ColourRowLayout,
+} from './utils/colourRowLayout';
 
 const PART_BUTTONS: [Part, string][] = [['head', 'Head'], ['body', 'Body'], ['eyes', 'Eyes']];
 
 /**
- * The lobby's colour panel: preview snake, Head/Body/Eyes buttons and the palette, all visible at once.
+ * The lobby's colour row: preview box with the snake, Head/Body/Eyes buttons and the palette, all visible at once.
+ * Laid out from the row's top-left corner inside the lobby panel.
  * The scene only listens for picks; the panel owns every object it creates and removes them in destroy().
  */
 export class ColourPanel {
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
-  private readonly buttons = new Map<Part, Phaser.GameObjects.Text>();
+  private readonly buttons = new Map<Part, PixelButton>();
   private readonly swatches: { colour: string; rect: Phaser.GameObjects.Rectangle }[] = [];
+  private readonly layout: ColourRowLayout;
   private readonly bodyGraphics: Phaser.GameObjects.Graphics;
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly highlight: Phaser.GameObjects.Graphics;
 
   constructor(
     scene: Phaser.Scene,
+    x: number,
+    y: number,
     private readonly selection: ColourSelection,
     private readonly onPick: () => void
   ) {
+    this.layout = computeColourRowLayout(x, y);
+    this.createPreviewBox(scene);
     this.bodyGraphics = scene.add.graphics();
     this.graphics = scene.add.graphics();
     this.highlight = scene.add.graphics();
@@ -43,13 +47,16 @@ export class ColourPanel {
 
   setVisible(visible: boolean): void {
     this.objects.forEach((obj) => (obj as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Visible).setVisible(visible));
+    this.buttons.forEach((button) => button.setVisible(visible));
   }
 
   /** Redraws everything that depends on the selection or the colours. */
   refresh(): void {
     this.drawPreview();
-    this.buttons.forEach((button, part) =>
-      button.setStyle({ backgroundColor: part === this.selection.selectedPart ? '#555555' : '#333333' }));
+    this.buttons.forEach((button, part) => {
+      const selected = part === this.selection.selectedPart;
+      button.setFill(selected ? 'button-alt' : 'field').setPressed(selected);
+    });
     const outlined = this.selection.outlinedColour().toLowerCase();
     this.swatches.forEach(({ colour, rect }) => rect.setStrokeStyle(colour.toLowerCase() === outlined ? 4 : 2, 0xffffff));
   }
@@ -57,6 +64,7 @@ export class ColourPanel {
   destroy(): void {
     this.objects.forEach((obj) => obj.destroy());
     this.objects.length = 0;
+    this.buttons.forEach((button) => button.destroy());
     this.buttons.clear();
     this.swatches.length = 0;
   }
@@ -74,7 +82,7 @@ export class ColourPanel {
       cells: [{ x: 2, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 }],
       colors: this.selection.displayedColours(),
       cellSize: CELL,
-      origin: PREVIEW_ORIGIN,
+      origin: this.layout.snakeOrigin,
       bodyStyle: feature.snakeBody === 'blocks' ? 'blocks' : 'joints',
       bodyWidth: feature.snakeBodyWidth,
       isDead: false,
@@ -83,7 +91,7 @@ export class ColourPanel {
   }
 
   private createPreviewZones(scene: Phaser.Scene): void {
-    const { x: ox, y: oy } = PREVIEW_ORIGIN;
+    const { x: ox, y: oy } = this.layout.snakeOrigin;
     const zone = (part: Part, x: number, y: number, width: number, height: number) => {
       const area = scene.add.zone(x, y, width, height).setOrigin(0).setInteractive({ useHandCursor: true });
       area.on('pointerover', () => {
@@ -102,23 +110,37 @@ export class ColourPanel {
     zone('eyes', ox + CELL * 2 + CELL / 5 - 3, oy - 3, CELL * 0.6 + 6, CELL / 5 + 6);
   }
 
+  private createPreviewBox(scene: Phaser.Scene): void {
+    const gfx = scene.add.graphics().setScrollFactor(0);
+    this.fillRects(gfx, computePreviewBoxRects(), this.layout.box.x, this.layout.box.y);
+    this.objects.push(gfx);
+  }
+
+  private fillRects(gfx: Phaser.GameObjects.Graphics, rects: BoxRect[], ox: number, oy: number): void {
+    for (const r of rects) {
+      gfx.fillStyle(r.color, r.alpha);
+      gfx.fillRect(ox + r.x, oy + r.y, r.w, r.h);
+    }
+  }
+
   private createPartButtons(scene: Phaser.Scene): void {
     PART_BUTTONS.forEach(([part, label], i) => {
-      const button = scene.add.text(400 + (i - 1) * 90, BUTTONS_Y, label, {
-        fontSize: '20px', color: '#ffffff', padding: { x: 10, y: 5 },
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      button.on('pointerdown', () => this.select(part));
-      this.buttons.set(part, button);
-      this.objects.push(button);
+      this.buttons.set(part, new PixelButton(scene, {
+        ...this.layout.partButtons[i],
+        width: PART_BUTTON.width,
+        height: PART_BUTTON_HEIGHT,
+        label,
+        size: 'small',
+        fill: 'field',
+        onClick: () => this.select(part),
+      }));
     });
   }
 
   private createSwatches(scene: Phaser.Scene): void {
-    const left = 400 - (COLS * SWATCH + (COLS - 1) * GAP) / 2;
     PALETTE.forEach((colour, i) => {
-      const x = left + (i % COLS) * (SWATCH + GAP);
-      const y = PALETTE_TOP + Math.floor(i / COLS) * (SWATCH + GAP);
-      const rect = scene.add.rectangle(x, y, SWATCH, SWATCH, Phaser.Display.Color.HexStringToColor(colour).color)
+      const { x, y } = swatchPosition(this.layout, i);
+      const rect = scene.add.rectangle(x, y, SWATCH.size, SWATCH.size, Phaser.Display.Color.HexStringToColor(colour).color)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true });
       rect.on('pointerover', () => {
@@ -136,6 +158,9 @@ export class ColourPanel {
       });
       this.swatches.push({ colour, rect });
       this.objects.push(rect);
+      const edges = scene.add.graphics().setScrollFactor(0);
+      this.fillRects(edges, computeSwatchEdgeRects(), x, y);
+      this.objects.push(edges);
     });
   }
 }

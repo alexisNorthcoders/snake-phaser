@@ -1,9 +1,10 @@
 export type ButtonSize = 'small' | 'large';
-export type ButtonFill = 'button' | 'button-alt' | 'action';
+export type ButtonFill = 'button' | 'button-alt' | 'field' | 'action';
 
 export const BUTTON_FILLS: Record<ButtonFill, { fill: number; hover: number }> = {
   button: { fill: 0x222222, hover: 0x444444 },
   'button-alt': { fill: 0x555555, hover: 0x777777 },
+  field: { fill: 0x333333, hover: 0x444444 },
   action: { fill: 0x00aa00, hover: 0x00cc00 },
 };
 
