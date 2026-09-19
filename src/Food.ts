@@ -21,7 +21,10 @@ export class Food {
 
     updateFood(position: GridPosition, type: FoodType) {
         this.position = { x: position.x * this.cellSize, y: this.cellSize + position.y * this.cellSize }
-        this.sprite?.setTexture(type)
+        this.type = type
+        // setTexture resets the frame to the new texture's native size but keeps the old scale,
+        // and themed textures differ in native size — re-fit to the cell.
+        this.sprite?.setTexture(type).setDisplaySize(this.cellSize, this.cellSize)
     }
 
     destroy(): void {
