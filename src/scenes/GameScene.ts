@@ -243,9 +243,9 @@ export class GameScene extends Phaser.Scene {
 
     this.bg = this.add.tileSprite(
       0,
-      40,
+      0,
       this.scale.width,
-      this.scale.height - 40,
+      this.scale.height,
       BACKGROUND_TEXTURE
     ).setOrigin(0, 0).setDepth(BACKGROUND_DEPTH);
 
