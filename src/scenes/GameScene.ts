@@ -1,3 +1,4 @@
+import { computeGameOverLayout } from '../utils/gameOverLayout';
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
@@ -561,7 +562,7 @@ export class GameScene extends Phaser.Scene {
   private async displayGameOverScreen(payload: GameOverPayload) {
     const topScores: HighScore[] = (await getHighScores()).slice(0, 3);
 
-    const PANEL_CENTER_X = 400;
+    const { centerX: PANEL_CENTER_X, panelWidth: PANEL_WIDTH } = computeGameOverLayout(this.scale.width);
     const TITLE_Y = 170;
     const RANKINGS_START_Y = 220;
     const ROW_HEIGHT = 28;
@@ -570,7 +571,6 @@ export class GameScene extends Phaser.Scene {
     const SAVE_SCORE_GAP = 50;
     const PANEL_TOP_PADDING = 30;
     const PANEL_BOTTOM_PADDING = 40;
-    const PANEL_WIDTH = 360;
 
     const rankings = payload?.rankings ?? [];
     const rankingsEndY = rankings.length > 0
