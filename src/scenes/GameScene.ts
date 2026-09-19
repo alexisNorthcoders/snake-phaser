@@ -21,6 +21,7 @@ import { PixelButton } from '../PixelButton';
 import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
 import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
+import { ScoreboardPanel } from '../ScoreboardPanel';
 import { LOBBY_PANEL, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
@@ -50,9 +51,7 @@ export class GameScene extends Phaser.Scene {
   private pingBars?: Phaser.GameObjects.Graphics;
   private fpsText?: Phaser.GameObjects.Text;
   private fpsMeter = createFpsMeter();
-  public scoreboardTexts: Map<string, Phaser.GameObjects.Text> = new Map();
-  public scoreboardBg!: Phaser.GameObjects.Rectangle;
-  public scoreboardHeader!: Phaser.GameObjects.Text;
+  public scoreboard?: ScoreboardPanel;
   private headerButton?: PixelButton;
   public scoreboardVisible: boolean = false;
   public isGameOver: boolean = false;
@@ -289,21 +288,8 @@ export class GameScene extends Phaser.Scene {
       },
     });
 
-    const SCOREBOARD_X = 600;
-    const SCOREBOARD_Y = 50;
-    const SCOREBOARD_WIDTH = 190;
-    const SCOREBOARD_HEADER_HEIGHT = 26;
-
-    this.scoreboardBg = this.add.rectangle(SCOREBOARD_X, SCOREBOARD_Y, SCOREBOARD_WIDTH, SCOREBOARD_HEADER_HEIGHT, 0x000000, 0.6)
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setDepth(10)
-      .setVisible(false);
-
-    this.scoreboardHeader = this.add.text(SCOREBOARD_X + 10, SCOREBOARD_Y + 4, 'SCOREBOARD', {
-      fontSize: '16px',
-      color: '#ff4444',
-    }).setScrollFactor(0).setDepth(10).setVisible(false);
+    this.scoreboard?.destroy();
+    this.scoreboard = new ScoreboardPanel(this);
 
     this.input.keyboard?.on('keydown-TAB', (event: KeyboardEvent) => {
       event.preventDefault();
@@ -618,14 +604,12 @@ export class GameScene extends Phaser.Scene {
 
   private setScoreboardVisible(visible: boolean) {
     this.scoreboardVisible = visible;
-    this.scoreboardBg?.setVisible(visible);
-    this.scoreboardHeader?.setVisible(visible);
-    this.scoreboardTexts.forEach((text) => text.setVisible(visible));
+    this.scoreboard?.setVisible(visible);
   }
 
   private clearScoreboard() {
-    this.scoreboardTexts.forEach((text) => text.destroy());
-    this.scoreboardTexts.clear();
+    this.scoreboard?.destroy();
+    this.scoreboard = undefined;
   }
 
   // Update the header ping readout and signal meter; undefined means no ping yet.
@@ -717,7 +701,6 @@ export class GameScene extends Phaser.Scene {
     this.isGameOver = false;
     this.gameConfigured = false;
     this.gameOverObjects = [];
-    this.scoreboardTexts = new Map();
     this.scoreboardVisible = false;
   }
 
@@ -743,8 +726,6 @@ export class GameScene extends Phaser.Scene {
     this.pingBars = undefined;
     this.headerButton?.destroy();
     this.headerButton = undefined;
-    this.scoreboardBg?.destroy();
-    this.scoreboardHeader?.destroy();
     this.destroyLobbyPanel();
     this.destroyColourPanel();
     this.destroyLobbyAmbience();
