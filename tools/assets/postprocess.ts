@@ -133,3 +133,16 @@ export async function trimToContent(sprite: Buffer, margin = 1): Promise<Buffer>
         .png()
         .toBuffer()
 }
+
+/**
+ * Finishes a background tile: confirms the size and flattens it to fully opaque, so a stray
+ * transparent pixel can't punch a hole through the board when the tile repeats.
+ */
+export async function finishTile(raw: Buffer, size: number): Promise<Buffer> {
+    const { data, info } = await sharp(raw).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    if (info.width !== size || info.height !== size) {
+        throw new Error(`Expected a ${size}x${size} tile but got ${info.width}x${info.height}`)
+    }
+    for (let i = 3; i < data.length; i += 4) data[i] = 255
+    return sharp(data, { raw: { width: size, height: size, channels: 4 } }).png().toBuffer()
+}

@@ -1,21 +1,26 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { DEFAULT_PROVIDER, DEFAULT_SHEET_MODEL, isFoodType, type FoodType, type Theme } from './theme.ts'
+import { BACKGROUND_SIZE, DEFAULT_BACKGROUND_STYLE, DEFAULT_PROVIDER, DEFAULT_SHEET_MODEL, isFoodType, type FoodType, type Theme } from './theme.ts'
 import { loadTheme } from './loadTheme.ts'
-import { CANDIDATES_PER_SLOT, candidateFile, renderContactSheet, resolveSlots, sheetCandidateFile, type Candidate } from './candidates.ts'
-import { buildPrompt, buildSheetPrompt } from './prompt.ts'
+import { CANDIDATES_PER_SLOT, backgroundCandidateFile, candidateFile, renderContactSheet, resolveSlots, sheetCandidateFile, type Candidate } from './candidates.ts'
+import { buildBackgroundPrompt, buildPrompt, buildSheetPrompt } from './prompt.ts'
 import { renderSheet } from './deepinfra.ts'
 import { cutOutObjects } from './cutout.ts'
 import { createPixelFixer } from './pixelFixer.ts'
 import { estimateCost, generateCandidates, loadPalette } from './retroDiffusion.ts'
-import { finishNativeSprite, removeBackground, trimToContent } from './postprocess.ts'
+import { finishNativeSprite, finishTile, removeBackground, trimToContent } from './postprocess.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
 
 /** Reads the processed candidates already on disk, so re-rolled slots keep the others' candidates in the sheet. */
-async function listCandidates(dir: string): Promise<{ candidates: Candidate[]; sheetCandidates: number[] }> {
+async function listCandidates(dir: string): Promise<{ candidates: Candidate[]; sheetCandidates: number[]; backgroundCandidates: number[] }> {
     const found: Candidate[] = []
     const sheetCandidates: number[] = []
+    const backgroundCandidates: number[] = []
+    for (const file of await readdir(`${dir}/background`)) {
+        const tile = /^tile-(\d+)\.png$/.exec(file)
+        if (tile) backgroundCandidates.push(Number(tile[1]))
+    }
     for (const file of await readdir(`${dir}/food`)) {
         const sheet = /^sheet-(\d+)\.png$/.exec(file)
         if (sheet) sheetCandidates.push(Number(sheet[1]))
@@ -25,7 +30,7 @@ async function listCandidates(dir: string): Promise<{ candidates: Candidate[]; s
         // Only the fixed 1..N indices count; leftovers from older runs must not appear in the sheet.
         if (index >= 1 && index <= CANDIDATES_PER_SLOT) found.push({ slot: m[1], index })
     }
-    return { candidates: found, sheetCandidates }
+    return { candidates: found, sheetCandidates, backgroundCandidates }
 }
 
 async function generateRetroDiffusion(theme: Theme, style: string, slots: readonly FoodType[], dir: string) {
@@ -49,6 +54,36 @@ async function generateRetroDiffusion(theme: Theme, style: string, slots: readon
             await writeFile(`${dir}/raw/${file}`, raw)
             await writeFile(`${dir}/food/${file}`, await trimToContent(await finishNativeSprite(raw, theme.size)))
         }
+    }
+}
+
+/** Next unused tile number, so re-rolling a background keeps the earlier tiles to compare against. */
+async function nextBackgroundIndex(dir: string): Promise<number> {
+    const { backgroundCandidates } = await listCandidates(dir)
+    return Math.max(0, ...backgroundCandidates) + 1
+}
+
+/** Seamless background tiles: one paid request, `tile_x`/`tile_y` on, background removal off. */
+async function generateBackground(theme: Theme, dir: string) {
+    const apiKey = process.env.RETRO_DIFFUSION_API_KEY
+    const palette = theme.palette ? await loadPalette(theme.palette) : undefined
+    const style = theme.background.style ?? DEFAULT_BACKGROUND_STYLE
+    // `rd_tile__*` styles render one image per request; everything else takes the usual batch.
+    const numImages = style.startsWith('rd_tile__') ? 1 : undefined
+    const request = { prompt: buildBackgroundPrompt(theme), style, palette, size: BACKGROUND_SIZE, tiling: true, numImages }
+
+    const { cost, remainingBalance } = await estimateCost([request], { apiKey })
+    console.log(`Cost check (free): $${cost.toFixed(3)} for 1 background request; remaining balance $${remainingBalance.toFixed(2)}`)
+
+    console.log(`Generating seamless ${BACKGROUND_SIZE}x${BACKGROUND_SIZE} background tiles with ${style}...`)
+    const images = await generateCandidates(request, { apiKey })
+    let index = await nextBackgroundIndex(dir)
+    for (const raw of images) {
+        const file = backgroundCandidateFile(index)
+        await writeFile(`${dir}/raw/${file}`, raw)
+        await writeFile(`${dir}/background/${file}`, await finishTile(raw, BACKGROUND_SIZE))
+        console.log(`  tile #${index}`)
+        index++
     }
 }
 
@@ -81,10 +116,13 @@ async function generateSheet(theme: Theme, model: string, dir: string) {
 
 async function main() {
     const { values, positionals } = parseArgs({
-        options: { theme: { type: 'string' }, only: { type: 'string', multiple: true } },
+        options: { theme: { type: 'string' }, only: { type: 'string', multiple: true }, background: { type: 'boolean' } },
         allowPositionals: true,
     })
-    if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--only <foodType>[,<foodType>...]]... (repeat --only or comma-separate)')
+    if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--background | [--only <foodType>[,<foodType>...]]...] (repeat --only or comma-separate)')
+    if (values.background && values.only?.length) {
+        throw new Error('--background generates the theme background tile, so it cannot be combined with --only.')
+    }
     if (positionals.length > 0) {
         throw new Error(`Unexpected argument(s): ${positionals.join(' ')}. Use --only a --only b or --only a,b`)
     }
@@ -102,19 +140,22 @@ async function main() {
     const dir = `${OUTPUT_ROOT}/${theme.name}`
     await mkdir(`${dir}/raw`, { recursive: true })
     await mkdir(`${dir}/food`, { recursive: true })
+    await mkdir(`${dir}/background`, { recursive: true })
 
     // The contact sheet is rewritten even if a later call fails, so completed candidates are never invisible.
     try {
         const provider = theme.provider ?? DEFAULT_PROVIDER
-        if (provider.kind === 'deepinfra-sheet') {
+        if (values.background) {
+            await generateBackground(theme, dir)
+        } else if (provider.kind === 'deepinfra-sheet') {
             if (values.only?.length) throw new Error('--only does not apply to deepinfra-sheet themes: a sheet is not tied to food slots.')
             await generateSheet(theme, provider.model ?? DEFAULT_SHEET_MODEL, dir)
         } else {
             await generateRetroDiffusion(theme, provider.style, slots, dir)
         }
     } finally {
-        const { candidates, sheetCandidates } = await listCandidates(dir)
-        await writeFile(`${dir}/index.html`, renderContactSheet(theme.name, candidates, sheetCandidates))
+        const { candidates, sheetCandidates, backgroundCandidates } = await listCandidates(dir)
+        await writeFile(`${dir}/index.html`, renderContactSheet(theme.name, candidates, sheetCandidates, backgroundCandidates))
     }
     console.log(`Contact sheet: ${dir}/index.html`)
 }

@@ -3,7 +3,10 @@ import type { Theme } from '../theme.ts'
 export const theme: Theme = {
     name: 'goblin-treasure',
     provider: { kind: 'retro-diffusion', style: 'rd_fast__mc_item' },
-    background: 'plain white',
+    backdrop: 'plain white',
+    background: {
+        description: 'a dark goblin cave floor of rough uneven flagstones, cracked grey-green stone with patches of damp moss in the gaps and scattered grit',
+    },
     palette: 'tools/assets/themes/goblin-treasure.palette.png',
     size: 32,
     food: {

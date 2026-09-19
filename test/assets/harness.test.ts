@@ -2,13 +2,27 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { theme } from '../../tools/assets/themes/goblin-treasure.ts'
 import { FOOD_TYPES } from '../../tools/assets/theme.ts'
-import { buildPrompt, buildSheetPrompt } from '../../tools/assets/prompt.ts'
+import { buildBackgroundPrompt, buildPrompt, buildSheetPrompt } from '../../tools/assets/prompt.ts'
 import { resolveSlots, renderContactSheet } from '../../tools/assets/candidates.ts'
+import { loadTheme } from '../../tools/assets/loadTheme.ts'
 
-test('prompt is the description plus the stated background, with no style words', () => {
+test('prompt is the description plus the stated backdrop, with no style words', () => {
   assert.equal(buildPrompt(theme, 'banana'), `${theme.food.banana}, on a plain white background`)
-  const dark = { ...theme, background: 'flat magenta' }
+  const dark = { ...theme, backdrop: 'flat magenta' }
   assert.equal(buildPrompt(dark, 'banana'), `${theme.food.banana}, on a flat magenta background`)
+})
+
+test('the background prompt is the tile description alone: tiling is a request flag, not prompt words', () => {
+  assert.equal(buildBackgroundPrompt(theme), theme.background.description)
+  assert.doesNotMatch(buildBackgroundPrompt(theme), /seamless|tile/i)
+})
+
+test('every theme names a background tile and covers every food type', async () => {
+  for (const name of ['goblin-treasure', 'classic']) {
+    const loaded = await loadTheme(name)
+    assert.ok(loaded.background.description, `${name} has no background description`)
+    assert.deepEqual(Object.keys(loaded.food).sort(), [...FOOD_TYPES].sort())
+  }
 })
 
 test('goblin theme covers every food type and uses Retro Diffusion mc_item', () => {
@@ -37,6 +51,15 @@ test('sheet prompt names every food item on the flat background with no shadows 
   for (const slot of FOOD_TYPES) assert.ok(prompt.includes(theme.food[slot]))
   assert.match(prompt, /flat plain white background/)
   assert.match(prompt, /no shadows, no text/)
+})
+
+test('contact sheet shows each background tile alone and repeated, so seams show', () => {
+  const html = renderContactSheet('t', [], [], [2, 1])
+  assert.match(html, /tile #1/)
+  assert.match(html, /src="background\/tile-2\.png" width="64"/)
+  assert.match(html, /background-image:url\(background\/tile-2\.png\)/)
+  assert.match(html, /href="raw\/tile-2\.png"/)
+  assert.ok(html.indexOf('tile #1') < html.indexOf('tile #2'))
 })
 
 test('contact sheet lists numbered sheet candidates', () => {

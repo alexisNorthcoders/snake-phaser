@@ -20,6 +20,12 @@ export interface ImageRequest {
     style: string
     /** Raw base64 palette image (no `data:` prefix), sent as `input_palette`. */
     palette?: string
+    /** Square edge length; defaults to NATIVE_SIZE. */
+    size?: number
+    /** Candidates per request; defaults to IMAGES_PER_REQUEST. Tile styles cap this at 1. */
+    numImages?: number
+    /** Seamless on both axes. A tile is opaque, so it also turns background removal off. */
+    tiling?: boolean
 }
 
 export interface CostEstimate {
@@ -55,13 +61,16 @@ export async function loadPalette(path: string): Promise<string> {
 }
 
 function body(req: ImageRequest, extra: Record<string, unknown>) {
+    const size = req.size ?? NATIVE_SIZE
     return {
         prompt: req.prompt,
         prompt_style: req.style,
-        width: NATIVE_SIZE,
-        height: NATIVE_SIZE,
-        num_images: IMAGES_PER_REQUEST,
-        remove_bg: true,
+        width: size,
+        height: size,
+        num_images: req.numImages ?? IMAGES_PER_REQUEST,
+        // A seamless tile covers the whole image: removing its background would eat the tile.
+        remove_bg: !req.tiling,
+        ...(req.tiling ? { tile_x: true, tile_y: true } : {}),
         ...(req.palette ? { input_palette: req.palette } : {}),
         ...extra,
     }
