@@ -1,21 +1,13 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { DEFAULT_MODEL, isFoodType, resolveSlot, FOOD_TYPES, type Theme } from './theme.ts'
+import { DEFAULT_MODEL, isFoodType, resolveSlot } from './theme.ts'
+import { loadTheme } from './loadTheme.ts'
 import { CANDIDATES_PER_SLOT, candidateFile, renderContactSheet, resolveSlots, type Candidate } from './candidates.ts'
 import { buildPrompt } from './prompt.ts'
 import { generateImage } from './deepinfra.ts'
 import { processSprite } from './postprocess.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
-
-async function loadTheme(name: string): Promise<Theme> {
-    if (!/^[a-z0-9-]+$/.test(name)) throw new Error(`Invalid theme name "${name}"`)
-    try {
-        return (await import(`./themes/${name}.ts`)).theme
-    } catch (err) {
-        throw new Error(`Could not load theme "${name}" from tools/assets/themes/${name}.ts: ${(err as Error).message}`)
-    }
-}
 
 /** Reads the processed candidates already on disk, so re-rolled slots keep the others' candidates in the sheet. */
 async function listCandidates(dir: string): Promise<Candidate[]> {

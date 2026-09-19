@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "node --test 'test/**/*.test.ts'",
     "assets:generate": "node tools/assets/generate.ts",
+    "assets:promote": "node tools/assets/promote.ts",
     "typecheck:tools": "tsc -p tools/assets/tsconfig.json"
   },
   "devDependencies": {
