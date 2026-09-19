@@ -23,6 +23,12 @@ export interface CostEstimate {
     remainingBalance: number
 }
 
+/** The server answered with a definite refusal (4xx), so nothing was accepted or charged. */
+class RefusedError extends Error {}
+
+/** The server may have accepted the request but we never got a usable answer (network failure, 5xx, unreadable body). */
+class UnknownOutcomeError extends Error {}
+
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 function requireKey(apiKey: string | undefined): string {
@@ -59,18 +65,27 @@ function describeError(json: any): string {
 
 /** Sends one request and returns parsed JSON, turning non-JSON and non-OK responses into clear errors. */
 async function call(fetchFn: typeof fetch, key: string, method: 'GET' | 'POST', path: string, payload?: unknown, headers: Record<string, string> = {}): Promise<any> {
-    const res = await fetchFn(`${RETRO_DIFFUSION_API}${path}`, {
-        method,
-        headers: { 'X-RD-Token': key, ...(payload ? { 'Content-Type': 'application/json' } : {}), ...headers },
-        ...(payload ? { body: JSON.stringify(payload) } : {}),
-    })
+    let res: Response
+    try {
+        res = await fetchFn(`${RETRO_DIFFUSION_API}${path}`, {
+            method,
+            headers: { 'X-RD-Token': key, ...(payload ? { 'Content-Type': 'application/json' } : {}), ...headers },
+            ...(payload ? { body: JSON.stringify(payload) } : {}),
+        })
+    } catch (err) {
+        throw new UnknownOutcomeError(`Retro Diffusion request failed for ${method} ${path}: ${(err as Error).message}`)
+    }
     let json: any
     try {
         json = await res.json()
     } catch {
-        throw new Error(`Retro Diffusion API returned non-JSON (HTTP ${res.status}) for ${method} ${path}`)
+        const msg = `Retro Diffusion API returned non-JSON (HTTP ${res.status}) for ${method} ${path}`
+        throw res.ok || res.status >= 500 ? new UnknownOutcomeError(msg) : new RefusedError(msg)
     }
-    if (!res.ok) throw new Error(`Retro Diffusion API error (HTTP ${res.status}) for ${method} ${path}: ${describeError(json)}`)
+    if (!res.ok) {
+        const msg = `Retro Diffusion API error (HTTP ${res.status}) for ${method} ${path}: ${describeError(json)}`
+        throw res.status >= 500 ? new UnknownOutcomeError(msg) : new RefusedError(msg)
+    }
     return json
 }
 
@@ -84,16 +99,25 @@ export async function estimateCost(
     let remainingBalance = NaN
     for (const req of requests) {
         const json = await call(fetchFn, key, 'POST', '/inferences', body(req, { check_cost: true }))
-        cost += Number(json.balance_cost)
-        remainingBalance = Number(json.remaining_balance)
+        const requestCost = Number(json?.balance_cost)
+        const balance = Number(json?.remaining_balance)
+        if (json?.balance_cost == null || json?.remaining_balance == null || !Number.isFinite(requestCost) || !Number.isFinite(balance)) {
+            throw new Error(`Retro Diffusion cost check returned no usable balance_cost/remaining_balance: ${JSON.stringify(json)}`)
+        }
+        cost += requestCost
+        remainingBalance = balance
     }
+    if (!Number.isFinite(remainingBalance)) throw new Error('Retro Diffusion cost check ran no requests, so it has no balance to report.')
     return { cost, remainingBalance }
 }
 
 /** Recovers a task whose submission response was lost, instead of submitting (and paying) again. */
 async function recoverTask(fetchFn: typeof fetch, key: string, submittedAtSec: number, cause: unknown): Promise<string> {
     const json = await call(fetchFn, key, 'GET', '/inferences/tasks?limit=20')
-    const task = (json.tasks ?? []).find((t: any) => Number(t.created_at) >= submittedAtSec - 5 && t.status !== 'failed')
+    const recent = (json.tasks ?? [])
+        .filter((t: any) => t?.task_id && Number(t.created_at) >= submittedAtSec - 5)
+        .sort((a: any, b: any) => Number(b.created_at) - Number(a.created_at))
+    const task = recent[0]
     if (!task) {
         throw new Error(
             `Submission response was lost (${(cause as Error).message}) and no recent task was found. ` +
@@ -121,12 +145,12 @@ export async function generateCandidates(
     let taskId: string | undefined
     try {
         taskId = (await call(fetchFn, key, 'POST', '/inferences', body(req, {}), { 'Idempotency-Key': newIdempotencyKey() })).task_id
+        if (!taskId) throw new UnknownOutcomeError('Retro Diffusion accepted the request but returned no task_id.')
     } catch (err) {
-        // An HTTP error means the request was refused; only a lost response (network failure) can hide an accepted task.
-        if ((err as Error).message.startsWith('Retro Diffusion API')) throw err
+        // Only a definite refusal (4xx) is safe to surface; any unknown outcome is recovered by listing tasks, never by resubmitting.
+        if (!(err instanceof UnknownOutcomeError)) throw err
         taskId = await recoverTask(fetchFn, key, submittedAtSec, err)
     }
-    if (!taskId) throw new Error('Retro Diffusion accepted the request but returned no task_id.')
 
     for (let poll = 0; poll < maxPolls; poll++) {
         const task = await call(fetchFn, key, 'GET', `/inferences/tasks/${taskId}`)

@@ -91,3 +91,25 @@ test('cost check is a free dry run without an Idempotency-Key and totals every r
   assert.equal(est.remainingBalance, 10)
   assert.ok(calls.every((c) => c.body.check_cost === true && !('Idempotency-Key' in c.headers)))
 })
+
+test('a 5xx on submission is an unknown outcome and recovers from the task list', async () => {
+  const now = Math.floor(Date.now() / 1000)
+  const { fetchFn, calls } = fakeFetch([
+    [502, { detail: 'bad gateway' }],
+    [200, { tasks: [{ task_id: 't7', status: 'running', created_at: now }] }],
+    [200, { status: 'succeeded', result: { base64_images: [png('a')] } }],
+  ])
+  await generateCandidates(req, { ...opts, fetchFn })
+  assert.deepEqual(calls.map((c) => c.method), ['POST', 'GET', 'GET'])
+})
+
+test('a 2xx submission without a task_id recovers instead of resubmitting', async () => {
+  const { fetchFn, calls } = fakeFetch([[200, {}], [200, { tasks: [] }]])
+  await assert.rejects(generateCandidates(req, { ...opts, fetchFn }), /no recent task was found/)
+  assert.equal(calls.filter((c) => c.method === 'POST').length, 1)
+})
+
+test('cost check fails clearly on HTTP errors and missing balance fields', async () => {
+  await assert.rejects(estimateCost([req], { apiKey: 'k', fetchFn: fakeFetch([[401, { detail: 'bad token' }]]).fetchFn }), /HTTP 401.*bad token/)
+  await assert.rejects(estimateCost([req], { apiKey: 'k', fetchFn: fakeFetch([[200, { balance_cost: 0.02 }]]).fetchFn }), /no usable balance_cost/)
+})
