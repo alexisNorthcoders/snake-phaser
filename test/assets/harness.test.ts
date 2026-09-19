@@ -6,6 +6,7 @@ import { resolveSlot, FOOD_TYPES } from '../../tools/assets/theme.ts'
 import { buildPrompt } from '../../tools/assets/prompt.ts'
 import { generateImage } from '../../tools/assets/deepinfra.ts'
 import { processSprite } from '../../tools/assets/postprocess.ts'
+import { resolveSlots, renderContactSheet } from '../../tools/assets/candidates.ts'
 
 test('prompt combines item, style and key colour background', () => {
   const p = buildPrompt(theme, resolveSlot(theme, 'redApple'))
@@ -55,4 +56,20 @@ test('post-process removes key colour and resizes to 32x32', async () => {
   const mid = (16 * 32 + 16) * 4
   assert.equal(data[mid + 3], 255)
   assert.equal(data[mid], 255)
+})
+
+test('resolveSlots accepts repeats, comma lists, dedupes, and defaults to all', () => {
+  assert.deepEqual(resolveSlots([]), FOOD_TYPES)
+  assert.deepEqual(resolveSlots(['banana', 'cherry,banana']), ['banana', 'cherry'])
+  assert.throws(() => resolveSlots(['nope']), /Unknown food type "nope"/)
+})
+
+test('contact sheet labels each candidate and links raw renders', () => {
+  const html = renderContactSheet('t', [{ slot: 'banana', index: 2 }, { slot: 'banana', index: 1 }])
+  assert.match(html, /banana #1/)
+  assert.match(html, /src="food\/banana-2\.png" width="32"/)
+  assert.match(html, /src="food\/banana-2\.png" width="128"/)
+  assert.match(html, /href="raw\/banana-2\.png"/)
+  assert.ok(html.indexOf('banana #1') < html.indexOf('banana #2'))
+  assert.doesNotMatch(html, /cherry/)
 })
