@@ -1,4 +1,5 @@
 import { GridPosition } from "./Snake";
+import { HEADER } from "./pingSignal";
 
 export { type FoodType } from './foodTextures'
 import type { FoodType } from './foodTextures'
@@ -14,13 +15,13 @@ export class Food {
     constructor(scene: Phaser.Scene, position: GridPosition, id: number, type: FoodType) {
         this.scene = scene;
         this.cellSize = Math.floor(Math.min(scene.scale.width, scene.scale.height) / 20);
-        this.position = { x: position.x * this.cellSize, y: 40 + position.y * this.cellSize }
+        this.position = { x: position.x * this.cellSize, y: HEADER.height + position.y * this.cellSize }
         this.type = type
         this.id = id
     }
 
     updateFood(position: GridPosition, type: FoodType) {
-        this.position = { x: position.x * this.cellSize, y: this.cellSize + position.y * this.cellSize }
+        this.position = { x: position.x * this.cellSize, y: HEADER.height + position.y * this.cellSize }
         this.type = type
         // setTexture resets the frame to the new texture's native size but keeps the old scale,
         // and themed textures differ in native size — re-fit to the cell.
