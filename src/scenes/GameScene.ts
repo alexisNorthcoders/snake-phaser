@@ -568,10 +568,10 @@ export class GameScene extends Phaser.Scene {
       fill: 'action',
       fontSize: 24,
       onClick: () => {
-        this.clearGameOverOverlay();
-        this.isGameOver = false;
-        this.clearSnakesAndFood();
-        socketManager.send({ event: 'startGame' });
+        // Rounds never restart in place: leave the room and rejoin a fresh lobby so no stale round state survives.
+        this.destroyLobbyAmbience();
+        socketManager.close();
+        this.scene.restart();
       },
     }).setDepth(DEPTH);
     this.gameOverObjects.push(playAgain);
