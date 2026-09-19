@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import sharp from 'sharp'
-import { processSprite } from '../../tools/assets/postprocess.ts'
+import { finishNativeSprite, processSprite } from '../../tools/assets/postprocess.ts'
 
 type Rgb = [number, number, number]
 const MAGENTA: Rgb = [255, 0, 255]
@@ -97,4 +97,19 @@ test('a custom key colour is honoured', async () => {
   // The same image keyed as magenta leaves the green background opaque.
   const wrong = await pixels(await processSprite(raw, { keyColour: '#ff00ff', size: 32 }))
   assert.deepEqual(wrong.at(5, 5), [0, 255, 0, 255])
+})
+
+test('native sprites keep their pixels, only hardening alpha', async () => {
+  const data = Buffer.alloc(32 * 32 * 4)
+  data.set([10, 20, 30, 200], 0)
+  data.set([40, 50, 60, 20], 4)
+  const raw = await sharp(data, { raw: { width: 32, height: 32, channels: 4 } }).png().toBuffer()
+  const { at, info } = await pixels(await finishNativeSprite(raw, 32))
+  assert.equal(info.width, 32)
+  assert.deepEqual(at(0, 0), [10, 20, 30, 255])
+  assert.deepEqual(at(1, 0), [0, 0, 0, 0])
+})
+
+test('native sprites of the wrong size are rejected', async () => {
+  await assert.rejects(finishNativeSprite(await squareOnKey(MAGENTA), 32), /Expected a 32x32 image but got 64x64/)
 })

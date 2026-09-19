@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util'
 import { CANDIDATES_PER_SLOT, candidateFile } from './candidates.ts'
 import { loadTheme } from './loadTheme.ts'
 import { buildPrompt } from './prompt.ts'
-import { DEFAULT_MODEL, FOOD_TYPES, isFoodType, resolveSlot, type FoodType, type Theme } from './theme.ts'
+import { DEFAULT_PROVIDER, FOOD_TYPES, isFoodType, type FoodType, type Theme } from './theme.ts'
 import { foodTexturePath } from '../../src/foodTextures.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
@@ -108,8 +108,8 @@ export async function promote({ theme, picks, outputDir, publicDir, now = new Da
         const dest = `${publicDir}/${foodTexturePath(theme.name, slot)}`
         await copyFile(`${outputDir}/food/${candidateFile(slot, index)}`, dest)
         manifest.slots[slot] = {
-            model: theme.model ?? DEFAULT_MODEL,
-            prompt: buildPrompt(theme, resolveSlot(theme, slot)),
+            model: (theme.provider ?? DEFAULT_PROVIDER).style,
+            prompt: buildPrompt(theme, slot),
             timestamp: now.toISOString(),
         }
     }

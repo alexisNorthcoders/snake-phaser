@@ -6,7 +6,6 @@ import { theme } from '../../tools/assets/themes/goblin-treasure.ts'
 import { FOOD_TYPES } from '../../tools/assets/theme.ts'
 import { parsePicks, promote } from '../../tools/assets/promote.ts'
 import { buildPrompt } from '../../tools/assets/prompt.ts'
-import { resolveSlot } from '../../tools/assets/theme.ts'
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 async function setup() {
@@ -33,7 +32,7 @@ test('promote copies picks into the theme food folder and writes a manifest', as
   assert.deepEqual(await readFile(`${themeDir}/food/cherry.png`), Buffer.concat([PNG_SIGNATURE, Buffer.from('cherry2')]))
   const written = JSON.parse(await readFile(`${themeDir}/food/manifest.json`, 'utf8'))
   assert.deepEqual(written, m)
-  assert.equal(written.slots.banana?.prompt, buildPrompt(theme, resolveSlot(theme, 'banana')))
+  assert.equal(written.slots.banana?.prompt, buildPrompt(theme, 'banana'))
   assert.equal(written.slots.banana?.timestamp, now.toISOString())
   assert.ok(written.slots.banana?.model)
 })

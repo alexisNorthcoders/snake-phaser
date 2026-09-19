@@ -1,11 +1,11 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { DEFAULT_MODEL, isFoodType, resolveSlot } from './theme.ts'
+import { DEFAULT_PROVIDER, isFoodType } from './theme.ts'
 import { loadTheme } from './loadTheme.ts'
 import { CANDIDATES_PER_SLOT, candidateFile, renderContactSheet, resolveSlots, type Candidate } from './candidates.ts'
 import { buildPrompt } from './prompt.ts'
-import { generateImage } from './deepinfra.ts'
-import { processSprite } from './postprocess.ts'
+import { estimateCost, generateCandidates } from './retroDiffusion.ts'
+import { finishNativeSprite } from './postprocess.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
 
@@ -46,20 +46,25 @@ async function main() {
     await mkdir(`${dir}/raw`, { recursive: true })
     await mkdir(`${dir}/food`, { recursive: true })
 
-    for (const slot of slots) {
-        const resolved = resolveSlot(theme, slot)
-        const model = theme.model ?? DEFAULT_MODEL
-        const prompt = buildPrompt(theme, resolved)
-        console.log(`Generating ${CANDIDATES_PER_SLOT} candidates for ${slot} with ${model}...`)
-        await Promise.all(
-            Array.from({ length: CANDIDATES_PER_SLOT }, async (_, i) => {
-                const file = candidateFile(slot, i + 1)
-                const raw = await generateImage({ prompt, model }, { apiKey: process.env.DEEPINFRA_API_KEY })
-                await writeFile(`${dir}/raw/${file}`, raw)
-                const processed = await processSprite(raw, { keyColour: resolved.keyColour, size: theme.size })
-                await writeFile(`${dir}/food/${file}`, processed)
-            }),
-        )
+    const provider = theme.provider ?? DEFAULT_PROVIDER
+    const apiKey = process.env.RETRO_DIFFUSION_API_KEY
+    const requests = slots.map((slot) => ({ slot, prompt: buildPrompt(theme, slot), style: provider.style }))
+
+    const { cost, remainingBalance } = await estimateCost(requests, { apiKey })
+    console.log(`Cost check (free): $${cost.toFixed(3)} for ${requests.length} slot(s); remaining balance $${remainingBalance.toFixed(2)}`)
+
+    // Sequential on purpose: a lost submission is recovered from the newest task, which is only unambiguous one at a time.
+    for (const { slot, prompt, style } of requests) {
+        console.log(`Generating ${CANDIDATES_PER_SLOT} candidates for ${slot} with ${style}...`)
+        const images = await generateCandidates({ prompt, style }, { apiKey })
+        if (images.length < CANDIDATES_PER_SLOT) {
+            throw new Error(`Expected ${CANDIDATES_PER_SLOT} candidates for ${slot} but got ${images.length}`)
+        }
+        for (const [i, raw] of images.slice(0, CANDIDATES_PER_SLOT).entries()) {
+            const file = candidateFile(slot, i + 1)
+            await writeFile(`${dir}/raw/${file}`, raw)
+            await writeFile(`${dir}/food/${file}`, await finishNativeSprite(raw, theme.size))
+        }
     }
 
     await writeFile(`${dir}/index.html`, renderContactSheet(theme.name, await listCandidates(dir)))
