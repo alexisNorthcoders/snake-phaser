@@ -103,3 +103,33 @@ export async function finishNativeSprite(raw: Buffer, size: number): Promise<Buf
     hardenAlpha(data)
     return sharp(data, { raw: { width: size, height: size, channels: 4 } }).png().toBuffer()
 }
+
+/**
+ * Crops a transparent sprite to its opaque pixels and centres them on the smallest square canvas with
+ * `margin` transparent pixels around, so the game (which stretches every food texture to one cell)
+ * draws the item filling the cell. Pixels are moved, never resampled; an empty sprite is returned unchanged.
+ */
+export async function trimToContent(sprite: Buffer, margin = 1): Promise<Buffer> {
+    const { data, info } = await sharp(sprite).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    let left = info.width, top = info.height, right = -1, bottom = -1
+    for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+            if (data[(y * info.width + x) * 4 + 3] === 0) continue
+            left = Math.min(left, x)
+            right = Math.max(right, x)
+            top = Math.min(top, y)
+            bottom = Math.max(bottom, y)
+        }
+    }
+    if (right < 0) return sprite
+    const width = right - left + 1
+    const height = bottom - top + 1
+    const side = Math.max(width, height) + 2 * margin
+    const padLeft = Math.floor((side - width) / 2)
+    const padTop = Math.floor((side - height) / 2)
+    return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+        .extract({ left, top, width, height })
+        .extend({ left: padLeft, right: side - width - padLeft, top: padTop, bottom: side - height - padTop, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .png()
+        .toBuffer()
+}

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import sharp from 'sharp'
-import { finishNativeSprite, removeBackground } from '../../tools/assets/postprocess.ts'
+import { finishNativeSprite, removeBackground, trimToContent } from '../../tools/assets/postprocess.ts'
 
 type Rgb = [number, number, number]
 const RED: Rgb = [255, 0, 0]
@@ -75,4 +75,36 @@ test('native sprites keep their pixels, only hardening alpha', async () => {
 
 test('native sprites of the wrong size are rejected', async () => {
   await assert.rejects(finishNativeSprite(await image(64, 64, () => RED), 32), /Expected a 32x32 image but got 64x64/)
+})
+
+/** A size x size transparent sprite with red pixels where paint(x, y) is true. */
+async function sprite(size: number, paint: (x: number, y: number) => boolean): Promise<Buffer> {
+  const data = Buffer.alloc(size * size * 4)
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (paint(x, y)) data.set([...RED, 255], (y * size + x) * 4)
+  return sharp(data, { raw: { width: size, height: size, channels: 4 } }).png().toBuffer()
+}
+
+test('trimming crops a padded sprite to its item plus a 1px margin', async () => {
+  const { at, info } = await pixels(await trimToContent(await sprite(32, (x, y) => inRect(x, y, 8, 8, 24, 24))))
+  assert.equal(info.width, 18)
+  assert.equal(info.height, 18)
+  assert.equal(at(0, 0)[3], 0)
+  assert.deepEqual(at(1, 1), [...RED, 255])
+  assert.deepEqual(at(16, 16), [...RED, 255])
+  assert.equal(at(17, 17)[3], 0)
+})
+
+test('trimming a non-square item centres it on a square canvas', async () => {
+  const { at, info } = await pixels(await trimToContent(await sprite(32, (x, y) => inRect(x, y, 4, 10, 24, 14))))
+  assert.equal(info.width, 22)
+  assert.equal(info.height, 22)
+  assert.equal(at(1, 8)[3], 0)
+  assert.deepEqual(at(1, 9), [...RED, 255])
+  assert.deepEqual(at(20, 12), [...RED, 255])
+  assert.equal(at(20, 13)[3], 0)
+})
+
+test('trimming an empty sprite leaves it unchanged', async () => {
+  const empty = await sprite(32, () => false)
+  assert.deepEqual(await trimToContent(empty), empty)
 })

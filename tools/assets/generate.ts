@@ -8,7 +8,7 @@ import { renderSheet } from './deepinfra.ts'
 import { cutOutObjects } from './cutout.ts'
 import { createPixelFixer } from './pixelFixer.ts'
 import { estimateCost, generateCandidates, loadPalette } from './retroDiffusion.ts'
-import { finishNativeSprite, removeBackground } from './postprocess.ts'
+import { finishNativeSprite, removeBackground, trimToContent } from './postprocess.ts'
 
 const OUTPUT_ROOT = 'tools/assets/output'
 
@@ -47,7 +47,7 @@ async function generateRetroDiffusion(theme: Theme, style: string, slots: readon
         for (const [i, raw] of images.slice(0, CANDIDATES_PER_SLOT).entries()) {
             const file = candidateFile(slot, i + 1)
             await writeFile(`${dir}/raw/${file}`, raw)
-            await writeFile(`${dir}/food/${file}`, await finishNativeSprite(raw, theme.size))
+            await writeFile(`${dir}/food/${file}`, await trimToContent(await finishNativeSprite(raw, theme.size)))
         }
     }
 }
@@ -73,7 +73,7 @@ async function generateSheet(theme: Theme, model: string, dir: string) {
         const file = sheetCandidateFile(index)
         const fixed = await pixelFixer(cutout, theme.size)
         await writeFile(`${dir}/raw/${file}`, cutout)
-        await writeFile(`${dir}/food/${file}`, await removeBackground(fixed, theme.size))
+        await writeFile(`${dir}/food/${file}`, await trimToContent(await removeBackground(fixed, theme.size)))
         console.log(`  sheet #${index}`)
         index++
     }
