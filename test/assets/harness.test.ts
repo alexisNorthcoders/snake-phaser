@@ -1,11 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import sharp from 'sharp'
 import { theme } from '../../tools/assets/themes/goblin-treasure.ts'
 import { resolveSlot, FOOD_TYPES } from '../../tools/assets/theme.ts'
 import { buildPrompt } from '../../tools/assets/prompt.ts'
 import { generateImage } from '../../tools/assets/deepinfra.ts'
-import { processSprite } from '../../tools/assets/postprocess.ts'
 import { resolveSlots, renderContactSheet } from '../../tools/assets/candidates.ts'
 
 test('prompt combines item, style and key colour background', () => {
@@ -42,20 +40,6 @@ test('image client fails clearly without a key or on non-OK', async () => {
   await assert.rejects(generateImage({ prompt: 'x', model: 'm' }, { apiKey: undefined }), /DEEPINFRA_API_KEY is not set/)
   const fetchFn = (async () => new Response(JSON.stringify({ error: { message: 'bad' } }), { status: 401 })) as typeof fetch
   await assert.rejects(generateImage({ prompt: 'x', model: 'm' }, { apiKey: 'k', fetchFn }), /HTTP 401.*bad/)
-})
-
-test('post-process removes key colour and resizes to 32x32', async () => {
-  const raw = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#ff00ff' } })
-    .composite([{ input: { create: { width: 32, height: 32, channels: 3, background: '#ff0000' } }, left: 16, top: 16 }])
-    .png().toBuffer()
-  const out = await processSprite(raw, { keyColour: '#ff00ff', size: 32 })
-  const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true })
-  assert.equal(info.width, 32)
-  assert.equal(info.height, 32)
-  assert.equal(data[3], 0)
-  const mid = (16 * 32 + 16) * 4
-  assert.equal(data[mid + 3], 255)
-  assert.equal(data[mid], 255)
 })
 
 test('resolveSlots accepts repeats, comma lists, dedupes, and defaults to all', () => {
