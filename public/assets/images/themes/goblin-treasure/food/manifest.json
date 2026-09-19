@@ -1,0 +1,40 @@
+{
+  "theme": "goblin-treasure",
+  "slots": {
+    "redApple": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a single tarnished copper coin, thick round disc with a crude goblin face stamped on it, worn dull orange-brown metal with a bright highlight on the upper-left rim, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    },
+    "greenApple": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a squat round glass bottle of goblin grog, murky green liquid, cork stopper, patches of moss on the glass, bright highlight on the upper-left, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    },
+    "yellowApple": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a small silver ring, plain thick band with a tiny chip of blue glass set on top, shiny cool grey metal with a white highlight, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    },
+    "strawberry": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a crude lopsided gold crown with jagged uneven points, set with mismatched red and green gems, bright yellow gold with orange shading and a white highlight on the upper-left, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    },
+    "cherry": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a single large loose red ruby, cut into a faceted gem shape with a flat top and pointed bottom, deep crimson facets with bright pink edges and a white glint on the upper-left, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    },
+    "chili": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a small wooden treasure chest with iron bands, lid thrown wide open, heaped high with gold coins spilling over the edges, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    },
+    "banana": {
+      "model": "rd_fast__mc_item",
+      "prompt": "a round shiny gold nugget, a chunky ball of bright yellow gold with a slightly bumpy surface, orange shading on the lower-right and white sparkle highlights on the upper-left, on a plain white background",
+      "timestamp": "2026-09-19T17:28:41.790Z"
+    }
+  }
+}

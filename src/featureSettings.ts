@@ -1,4 +1,4 @@
-export type AssetTheme = 'classic'
+export type AssetTheme = 'classic' | 'goblin-treasure'
 
 export type SnakeBodyStyle = 'blocks' | 'joints' | 'arcs'
 
@@ -23,13 +23,13 @@ type Logger = Pick<Console, 'log' | 'warn'>
 const STORAGE_KEY = 'feature'
 
 const BODY_STYLES: SnakeBodyStyle[] = ['blocks', 'joints', 'arcs']
-const ASSET_THEMES: AssetTheme[] = ['classic']
+const ASSET_THEMES: AssetTheme[] = ['classic', 'goblin-treasure']
 const MIN_WIDTH = 0.5
 const MAX_WIDTH = 1
 
 type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'classic' }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure' }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
