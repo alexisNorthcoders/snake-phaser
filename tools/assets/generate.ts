@@ -1,6 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { DEFAULT_MODEL, isFoodType, resolveSlot, FOOD_TYPES, type FoodType, type Theme } from './theme.ts'
+import { DEFAULT_MODEL, isFoodType, resolveSlot, FOOD_TYPES, type Theme } from './theme.ts'
+import { CANDIDATES_PER_SLOT, candidateFile, renderContactSheet, resolveSlots, type Candidate } from './candidates.ts'
 import { buildPrompt } from './prompt.ts'
 import { generateImage } from './deepinfra.ts'
 import { processSprite } from './postprocess.ts'
@@ -16,9 +17,22 @@ async function loadTheme(name: string): Promise<Theme> {
     }
 }
 
+/** Reads the processed candidates already on disk, so re-rolled slots keep the others' candidates in the sheet. */
+async function listCandidates(dir: string): Promise<Candidate[]> {
+    const found: Candidate[] = []
+    for (const file of await readdir(`${dir}/food`)) {
+        const m = /^(.+)-(\d+)\.png$/.exec(file)
+        if (m && isFoodType(m[1])) found.push({ slot: m[1], index: Number(m[2]) })
+    }
+    return found
+}
+
 async function main() {
-    const { values } = parseArgs({ options: { theme: { type: 'string' }, only: { type: 'string' } } })
-    if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--only <foodType>]')
+    const { values, positionals } = parseArgs({
+        options: { theme: { type: 'string' }, only: { type: 'string', multiple: true } },
+        allowPositionals: true,
+    })
+    if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--only <foodType>...]')
 
     try {
         process.loadEnvFile('.env.local')
@@ -27,11 +41,8 @@ async function main() {
     }
 
     const theme = await loadTheme(values.theme)
-    let slots: readonly FoodType[] = FOOD_TYPES
-    if (values.only) {
-        if (!isFoodType(values.only)) throw new Error(`Unknown food type "${values.only}"; expected one of ${FOOD_TYPES.join(', ')}`)
-        slots = [values.only]
-    }
+    // npm-style `--only a b` leaves `b` as a positional.
+    const slots = resolveSlots([...(values.only ?? []), ...(values.only ? positionals : [])])
 
     const dir = `${OUTPUT_ROOT}/${theme.name}`
     await mkdir(`${dir}/raw`, { recursive: true })
@@ -40,16 +51,21 @@ async function main() {
     for (const slot of slots) {
         const resolved = resolveSlot(theme, slot)
         const model = theme.model ?? DEFAULT_MODEL
-        console.log(`Generating ${slot} with ${model}...`)
-        const raw = await generateImage(
-            { prompt: buildPrompt(theme, resolved), model },
-            { apiKey: process.env.DEEPINFRA_API_KEY },
+        const prompt = buildPrompt(theme, resolved)
+        console.log(`Generating ${CANDIDATES_PER_SLOT} candidates for ${slot} with ${model}...`)
+        await Promise.all(
+            Array.from({ length: CANDIDATES_PER_SLOT }, async (_, i) => {
+                const file = candidateFile(slot, i + 1)
+                const raw = await generateImage({ prompt, model }, { apiKey: process.env.DEEPINFRA_API_KEY })
+                await writeFile(`${dir}/raw/${file}`, raw)
+                const processed = await processSprite(raw, { keyColour: resolved.keyColour, size: theme.size })
+                await writeFile(`${dir}/food/${file}`, processed)
+            }),
         )
-        await writeFile(`${dir}/raw/${slot}.png`, raw)
-        const processed = await processSprite(raw, { keyColour: resolved.keyColour, size: theme.size })
-        await writeFile(`${dir}/food/${slot}.png`, processed)
-        console.log(`  wrote ${dir}/raw/${slot}.png and ${dir}/food/${slot}.png`)
     }
+
+    await writeFile(`${dir}/index.html`, renderContactSheet(theme.name, await listCandidates(dir)))
+    console.log(`Contact sheet: ${dir}/index.html`)
 }
 
 main().catch((err) => {
