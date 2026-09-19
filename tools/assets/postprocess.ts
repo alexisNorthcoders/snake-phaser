@@ -54,6 +54,17 @@ function keyOutFromEdges(data: Buffer, width: number, height: number, key: [numb
     }
 }
 
+/** Snaps every pixel to fully opaque or fully transparent (transparent pixels are zeroed). */
+function hardenAlpha(data: Buffer): void {
+    for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] >= ALPHA_THRESHOLD) {
+            data[i + 3] = 255
+        } else {
+            data[i] = data[i + 1] = data[i + 2] = data[i + 3] = 0
+        }
+    }
+}
+
 function opaqueBounds(data: Buffer, width: number, height: number) {
     let left = width, top = height, right = -1, bottom = -1
     for (let y = 0; y < height; y++) {
@@ -99,14 +110,21 @@ export async function processSprite(raw: Buffer, opts: SpriteOptions): Promise<B
         .raw()
         .toBuffer()
 
-    for (let i = 0; i < small.length; i += 4) {
-        if (small[i + 3] >= ALPHA_THRESHOLD) {
-            small[i + 3] = 255
-        } else {
-            small[i] = small[i + 1] = small[i + 2] = small[i + 3] = 0
-        }
-    }
+    hardenAlpha(small)
 
     const out = sharp(small, { raw: { width: opts.size, height: opts.size, channels: 4 } })
     return (opts.palette ? out.png({ palette: true, colours: opts.palette, dither: 0 }) : out.png()).toBuffer()
+}
+
+/**
+ * Finishes a native-resolution transparent sprite (e.g. from Retro Diffusion): no key-out, trim or
+ * downscale; only confirms the size and hardens alpha to 0/255.
+ */
+export async function finishNativeSprite(raw: Buffer, size: number): Promise<Buffer> {
+    const { data, info } = await sharp(raw).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    if (info.width !== size || info.height !== size) {
+        throw new Error(`Expected a ${size}x${size} image but got ${info.width}x${info.height}`)
+    }
+    hardenAlpha(data)
+    return sharp(data, { raw: { width: size, height: size, channels: 4 } }).png().toBuffer()
 }
