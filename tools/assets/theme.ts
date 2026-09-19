@@ -17,6 +17,8 @@ export interface Theme {
     provider?: Provider
     /** Flat colour stated in every prompt (removed by the provider); defaults to DEFAULT_BACKGROUND. */
     background?: string
+    /** Optional palette image (path from the repo root, committed with the theme) shared by every sprite so they look like one set. */
+    palette?: string
     /** Output sprite edge length in pixels. */
     size: 32
     /** Keyed exactly by the food types: a missing or extra slot is a compile error. Values are item descriptions. */
