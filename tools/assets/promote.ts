@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 import { CANDIDATES_PER_SLOT, candidateFile } from './candidates.ts'
 import { loadTheme } from './loadTheme.ts'
@@ -49,8 +49,15 @@ export function parsePicks(args: readonly string[]): { picks: Partial<Record<Foo
     return { picks, errors }
 }
 
-async function exists(path: string): Promise<boolean> {
-    return stat(path).then(() => true, () => false)
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+/** True when the file exists and starts with the PNG signature. */
+async function isPng(path: string): Promise<boolean> {
+    try {
+        return (await readFile(path)).subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)
+    } catch {
+        return false
+    }
 }
 
 export interface PromoteOptions {
@@ -65,19 +72,20 @@ export interface PromoteOptions {
 
 /**
  * Validates first and writes nothing unless every slot is covered: by a pick whose
- * candidate exists, or by a sprite already present in the theme folder.
+ * candidate is a valid PNG, or by a valid sprite already present in the theme folder.
  */
 export async function promote({ theme, picks, outputDir, publicDir, now = new Date() }: PromoteOptions): Promise<Manifest> {
-    const manifestPath = `${publicDir}/${foodTexturePath(theme.name, FOOD_TYPES[0]).replace(/[^/]+$/, '')}manifest.json` // beside the sprites
+    const foodDir = `${publicDir}/assets/images/themes/${theme.name}/food`
+    const manifestPath = `${foodDir}/manifest.json` // beside the sprites
     const problems: string[] = []
     for (const slot of FOOD_TYPES) {
         const index = picks[slot]
         if (index !== undefined) {
-            if (!(await exists(`${outputDir}/food/${candidateFile(slot, index)}`))) {
-                problems.push(`${slot}: candidate ${index} does not exist in ${outputDir}/food`)
+            if (!(await isPng(`${outputDir}/food/${candidateFile(slot, index)}`))) {
+                problems.push(`${slot}: candidate ${index} is missing or not a valid PNG in ${outputDir}/food`)
             }
-        } else if (!(await exists(`${publicDir}/${foodTexturePath(theme.name, slot)}`))) {
-            problems.push(`${slot}: no pick given and no existing sprite in the theme folder`)
+        } else if (!(await isPng(`${publicDir}/${foodTexturePath(theme.name, slot)}`))) {
+            problems.push(`${slot}: no pick given and no valid existing sprite in the theme folder`)
         }
     }
     if (problems.length > 0) throw new Error(`Cannot promote theme "${theme.name}":\n  ${problems.join('\n  ')}`)
@@ -89,6 +97,7 @@ export async function promote({ theme, picks, outputDir, publicDir, now = new Da
         // No previous manifest: only the picked slots get entries.
     }
 
+    await mkdir(foodDir, { recursive: true })
     const manifest: Manifest = { theme: theme.name, slots: {} }
     for (const slot of FOOD_TYPES) {
         const index = picks[slot]
@@ -97,7 +106,6 @@ export async function promote({ theme, picks, outputDir, publicDir, now = new Da
             continue
         }
         const dest = `${publicDir}/${foodTexturePath(theme.name, slot)}`
-        await mkdir(dest.replace(/\/[^/]+$/, ''), { recursive: true })
         await copyFile(`${outputDir}/food/${candidateFile(slot, index)}`, dest)
         manifest.slots[slot] = {
             model: theme.model ?? DEFAULT_MODEL,

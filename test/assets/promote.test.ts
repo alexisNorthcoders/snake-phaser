@@ -7,13 +7,14 @@ import { FOOD_TYPES } from '../../tools/assets/theme.ts'
 import { parsePicks, promote } from '../../tools/assets/promote.ts'
 import { buildPrompt } from '../../tools/assets/prompt.ts'
 import { resolveSlot } from '../../tools/assets/theme.ts'
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 async function setup() {
   const root = await mkdtemp(`${tmpdir()}/promote-`)
   const outputDir = `${root}/out`
   const publicDir = `${root}/public`
   await mkdir(`${outputDir}/food`, { recursive: true })
-  for (const slot of FOOD_TYPES) for (let i = 1; i <= 4; i++) await writeFile(`${outputDir}/food/${slot}-${i}.png`, `${slot}${i}`)
+  for (const slot of FOOD_TYPES) for (let i = 1; i <= 4; i++) await writeFile(`${outputDir}/food/${slot}-${i}.png`, Buffer.concat([PNG_SIGNATURE, Buffer.from(`${slot}${i}`)]))
   const themeDir = `${publicDir}/assets/images/themes/${theme.name}`
   return { outputDir, publicDir, themeDir }
 }
@@ -29,7 +30,7 @@ test('promote copies picks into the theme food folder and writes a manifest', as
   const { outputDir, publicDir, themeDir } = await setup()
   const now = new Date('2026-01-01T00:00:00Z')
   const m = await promote({ theme, picks: allPicks, outputDir, publicDir, now })
-  assert.equal(await readFile(`${themeDir}/food/cherry.png`, 'utf8'), 'cherry2')
+  assert.deepEqual(await readFile(`${themeDir}/food/cherry.png`), Buffer.concat([PNG_SIGNATURE, Buffer.from('cherry2')]))
   const written = JSON.parse(await readFile(`${themeDir}/food/manifest.json`, 'utf8'))
   assert.deepEqual(written, m)
   assert.equal(written.slots.banana?.prompt, buildPrompt(theme, resolveSlot(theme, 'banana')))
@@ -52,8 +53,8 @@ test('a subset can be re-promoted when other slots already exist', async () => {
   const { outputDir, publicDir, themeDir } = await setup()
   await promote({ theme, picks: allPicks, outputDir, publicDir, now: new Date('2026-01-01T00:00:00Z') })
   const m = await promote({ theme, picks: { cherry: 4 }, outputDir, publicDir, now: new Date('2026-02-01T00:00:00Z') })
-  assert.equal(await readFile(`${themeDir}/food/cherry.png`, 'utf8'), 'cherry4')
-  assert.equal(await readFile(`${themeDir}/food/banana.png`, 'utf8'), 'banana2')
+  assert.deepEqual(await readFile(`${themeDir}/food/cherry.png`), Buffer.concat([PNG_SIGNATURE, Buffer.from('cherry4')]))
+  assert.deepEqual(await readFile(`${themeDir}/food/banana.png`), Buffer.concat([PNG_SIGNATURE, Buffer.from('banana2')]))
   assert.equal(m.slots.cherry?.timestamp, '2026-02-01T00:00:00.000Z')
   assert.equal(m.slots.banana?.timestamp, '2026-01-01T00:00:00.000Z')
 })
