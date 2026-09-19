@@ -354,6 +354,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restartAsAccount() {
+    // The auth overlay has just stored the account in localStorage; refresh identity before restarting.
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    this.guest = isGuest(userData);
+    this.name = sessionName(userData, nameStore);
+    this.playerId = String(userData.userId);
+
     this.destroyLobbyAmbience();
     socketManager.close();
     this.scene.restart();
