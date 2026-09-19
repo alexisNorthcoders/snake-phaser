@@ -1,5 +1,6 @@
 import { Schema, type, ArraySchema } from "@colyseus/schema";
 import { FoodType } from "../Food";
+import type { Phase } from "../countdownOverlay";
 
 export class Food extends Schema {
     @type("number") x: number = 0;
@@ -54,7 +55,8 @@ export class Player extends Schema {
 }
 
 export class GameState extends Schema {
-    @type("string") phase: "lobby" | "countdown" | "playing" | "ended" = "lobby";
+    @type("string") phase: Phase = "lobby";
+    @type("number") countdown: number = 0;
     @type("number") aliveCount: number = 0;
     @type("number") backgroundNumber: number = 0;
     @type([Player]) players = new ArraySchema<Player>();

@@ -22,6 +22,7 @@ import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
 import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
+import { countdownLabel, type Phase } from '../countdownOverlay';
 import { LOBBY_PANEL, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
@@ -80,6 +81,9 @@ export class GameScene extends Phaser.Scene {
   private nameLabel?: Phaser.GameObjects.Text;
   private nameFieldFrame?: Phaser.GameObjects.Graphics;
   private gameOverObjects: { setVisible(visible: boolean): unknown; destroy(): void }[] = [];
+  private countdownText?: Phaser.GameObjects.Text;
+  private goTimer?: Phaser.Time.TimerEvent;
+  private lastPhase?: Phase;
   private reconnectText: Phaser.GameObjects.Text | null = null;
   private leaderboardPanel?: LeaderboardPanel;
 
@@ -263,6 +267,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.destroyFpsText();
       this.destroyLobbyAmbience();
+      this.resetCountdown();
     });
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -454,6 +459,39 @@ export class GameScene extends Phaser.Scene {
     console.log("[GameScene] Requesting game start");
     this.commitName();
     socketManager.send({ event: 'startGame' });
+  }
+
+  /** Called on every room state patch: drives the 3-2-1-GO overlay from the server's phase and countdown value. */
+  onPhaseState(phase: Phase, countdown: number) {
+    const label = countdownLabel(this.lastPhase, phase, countdown);
+    this.lastPhase = phase;
+    if (label === null) {
+      if (phase !== 'playing' || !this.goTimer) this.clearCountdownOverlay();
+      return;
+    }
+    this.goTimer?.remove();
+    this.goTimer = undefined;
+    if (!this.countdownText) {
+      const arenaTop = HEADER_BOTTOM;
+      this.countdownText = this.add.text(this.scale.width / 2, arenaTop + (this.scale.height - arenaTop) / 2, '', {
+        fontFamily: FONT_FAMILY, fontSize: '160px', color: '#ffffff', stroke: '#000000', strokeThickness: 10,
+      }).setOrigin(0.5).setDepth(20);
+    }
+    this.countdownText.setText(label);
+    if (label === 'GO!') this.goTimer = this.time.delayedCall(700, () => this.clearCountdownOverlay());
+  }
+
+  /** Single place to drop all countdown state (overlay and phase-transition memory) for a fresh scene or shutdown. */
+  private resetCountdown() {
+    this.clearCountdownOverlay();
+    this.lastPhase = undefined;
+  }
+
+  private clearCountdownOverlay() {
+    this.goTimer?.remove();
+    this.goTimer = undefined;
+    this.countdownText?.destroy();
+    this.countdownText = undefined;
   }
 
   onGameStarted() {
@@ -702,6 +740,9 @@ export class GameScene extends Phaser.Scene {
     this.gameConfigured = false;
     this.gameOverObjects = [];
     this.scoreboardVisible = false;
+    this.countdownText = undefined;
+    this.goTimer = undefined;
+    this.lastPhase = undefined;
   }
 
   shutdown() {
@@ -722,6 +763,7 @@ export class GameScene extends Phaser.Scene {
     this.scoreText?.destroy();
     this.pingText?.destroy();
     this.destroyFpsText();
+    this.resetCountdown();
     this.pingBars?.destroy();
     this.pingBars = undefined;
     this.headerButton?.destroy();

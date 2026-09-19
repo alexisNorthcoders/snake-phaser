@@ -86,7 +86,7 @@ class SocketManager {
           drawBackground(scene, String(state.backgroundNumber));
         }
 
-        if (state.phase === "playing") {
+        if (state.phase === "countdown" || state.phase === "playing") {
           if (!scene.gameStarted || scene.food.length === 0) {
             // Game just started, or a new round began: discard any leftover
             // snake/food graphics from the previous round before rebuilding
@@ -132,6 +132,8 @@ class SocketManager {
         });
 
         this.updateScoreboard(scene, state);
+
+        scene.onPhaseState?.(state.phase, state.countdown);
 
         state.players.forEach((player) => {
           if (player.snake) {
