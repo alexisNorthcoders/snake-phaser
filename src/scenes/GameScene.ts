@@ -267,7 +267,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.destroyFpsText();
       this.destroyLobbyAmbience();
-      this.clearCountdownOverlay();
+      this.resetCountdown();
     });
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -479,6 +479,12 @@ export class GameScene extends Phaser.Scene {
     }
     this.countdownText.setText(label);
     if (label === 'GO!') this.goTimer = this.time.delayedCall(700, () => this.clearCountdownOverlay());
+  }
+
+  /** Single place to drop all countdown state (overlay and phase-transition memory) for a fresh scene or shutdown. */
+  private resetCountdown() {
+    this.clearCountdownOverlay();
+    this.lastPhase = undefined;
   }
 
   private clearCountdownOverlay() {
@@ -734,9 +740,9 @@ export class GameScene extends Phaser.Scene {
     this.gameConfigured = false;
     this.gameOverObjects = [];
     this.scoreboardVisible = false;
-    this.lastPhase = undefined;
     this.countdownText = undefined;
     this.goTimer = undefined;
+    this.lastPhase = undefined;
   }
 
   shutdown() {
@@ -757,7 +763,7 @@ export class GameScene extends Phaser.Scene {
     this.scoreText?.destroy();
     this.pingText?.destroy();
     this.destroyFpsText();
-    this.clearCountdownOverlay();
+    this.resetCountdown();
     this.pingBars?.destroy();
     this.pingBars = undefined;
     this.headerButton?.destroy();
