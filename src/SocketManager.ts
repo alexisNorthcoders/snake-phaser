@@ -3,7 +3,6 @@ import { Snake } from "./Snake";
 import { GameScene } from "./scenes/GameScene";
 import { Food } from "./Food";
 import { GameState, tailCells } from "./schemas/Food";
-import { drawBackground } from "./utils";
 import { scoreboardRows } from "./utils/scoreboardLayout";
 
 class SocketManager {
@@ -88,10 +87,6 @@ class SocketManager {
 
       // Handle state changes for snake positions and food
       this.room.onStateChange((state) => {
-        if (state.backgroundNumber && scene.bg.texture.key !== String(state.backgroundNumber)) {
-          drawBackground(scene, String(state.backgroundNumber));
-        }
-
         if (state.phase === "countdown" || state.phase === "playing") {
           if (!scene.gameStarted || scene.food.length === 0) {
             // Game just started, or a new round began: discard any leftover

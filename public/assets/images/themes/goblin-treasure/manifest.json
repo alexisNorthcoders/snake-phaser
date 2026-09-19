@@ -36,5 +36,10 @@
       "prompt": "a round shiny gold nugget, a chunky ball of bright yellow gold with a slightly bumpy surface, orange shading on the lower-right and white sparkle highlights on the upper-left, on a plain white background",
       "timestamp": "2026-09-19T17:40:20.980Z"
     }
+  },
+  "background": {
+    "model": "rd_fast__texture",
+    "prompt": "a dark goblin cave floor of rough uneven flagstones, cracked grey-green stone with patches of damp moss in the gaps and scattered grit",
+    "timestamp": "2026-09-19T21:10:46.112Z"
   }
 }

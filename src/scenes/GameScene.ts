@@ -3,6 +3,7 @@ import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
 import { FOOD_TYPES, foodTexturePath } from '../foodTextures';
+import { BACKGROUND_TEXTURE, backgroundTexturePath } from '../backgroundTexture';
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
 import { ColourPanel } from '../ColourPanel';
@@ -228,13 +229,14 @@ export class GameScene extends Phaser.Scene {
       if ((FOOD_TYPES as readonly string[]).includes(key)) {
         console.warn(`[assets] failed to load food texture '${key}' from theme '${feature.assetTheme}' (${file.url})`);
       }
+      if (key === BACKGROUND_TEXTURE) {
+        console.warn(`[assets] failed to load the background tile of theme '${feature.assetTheme}' (${file.url})`);
+      }
     });
     for (const type of FOOD_TYPES) {
       this.load.image(type, foodTexturePath(feature.assetTheme, type));
     }
-    for (let i = 1; i <= 91; i++) {
-      this.load.image(`${i}`, `assets/images/backgrounds/color_background_${i}.png`);
-    }
+    this.load.image(BACKGROUND_TEXTURE, backgroundTexturePath(feature.assetTheme));
   }
 
   create() {
@@ -244,7 +246,7 @@ export class GameScene extends Phaser.Scene {
       40,
       this.scale.width,
       this.scale.height - 40,
-      '1'
+      BACKGROUND_TEXTURE
     ).setOrigin(0, 0).setDepth(BACKGROUND_DEPTH);
 
     this.add.rectangle(0, 0, this.scale.width, HEADER.height, 0x000000, 0.6).setOrigin(0);
