@@ -1,3 +1,5 @@
+export type AssetTheme = 'classic'
+
 export type SnakeBodyStyle = 'blocks' | 'joints' | 'arcs'
 
 export interface FeatureSettings {
@@ -9,6 +11,8 @@ export interface FeatureSettings {
     showFps: boolean
     /** Decorative snake wandering the edge of the initial lobby. */
     lobbyAmbience: boolean
+    /** Folder under assets/images/themes that food textures load from. */
+    assetTheme: AssetTheme
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -19,12 +23,13 @@ type Logger = Pick<Console, 'log' | 'warn'>
 const STORAGE_KEY = 'feature'
 
 const BODY_STYLES: SnakeBodyStyle[] = ['blocks', 'joints', 'arcs']
+const ASSET_THEMES: AssetTheme[] = ['classic']
 const MIN_WIDTH = 0.5
 const MAX_WIDTH = 1
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'classic' }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -64,6 +69,12 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return DEFAULTS.lobbyAmbience
     }
 
+    const assetTheme = (value: unknown): AssetTheme => {
+        if (ASSET_THEMES.includes(value as AssetTheme)) return value as AssetTheme
+        warn(`unknown assetTheme ${JSON.stringify(value)}, expected one of ${ASSET_THEMES.join(', ')}; using '${DEFAULTS.assetTheme}'`)
+        return DEFAULTS.assetTheme
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
@@ -71,6 +82,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         snakeHeadFollowsArc: 'snakeHeadFollowsArc' in stored ? headFollowsArc(stored.snakeHeadFollowsArc) : DEFAULTS.snakeHeadFollowsArc,
         showFps: 'showFps' in stored ? fpsFlag(stored.showFps) : DEFAULTS.showFps,
         lobbyAmbience: 'lobbyAmbience' in stored ? ambienceFlag(stored.lobbyAmbience) : DEFAULTS.lobbyAmbience,
+        assetTheme: 'assetTheme' in stored ? assetTheme(stored.assetTheme) : DEFAULTS.assetTheme,
     }
     const save = () => {
         try {
@@ -115,6 +127,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.lobbyAmbience = ambienceFlag(show)
             save()
         },
+        get assetTheme() { return values.assetTheme },
+        set assetTheme(theme) {
+            values.assetTheme = assetTheme(theme)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
@@ -123,6 +140,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.snakeHeadFollowsArc = ${values.snakeHeadFollowsArc}    // true | false, only used by 'arcs'`,
                 `  feature.showFps = ${values.showFps}    // true | false, live FPS readout under Score`,
                 `  feature.lobbyAmbience = ${values.lobbyAmbience}    // true | false, decorative snake around the lobby edge`,
+                `  feature.assetTheme = '${values.assetTheme}'    // ${ASSET_THEMES.map((theme) => `'${theme}'`).join(' | ')}, folder food textures load from (reload to apply)`,
             ].join('\n'))
         },
     }

@@ -1,6 +1,7 @@
 import { GridPosition } from "./Snake";
 
-export type FoodType = 'redApple' | 'greenApple' | 'yellowApple' | 'strawberry' | 'cherry' | 'chili' | 'banana'
+export { type FoodType } from './foodTextures'
+import type { FoodType } from './foodTextures'
 
 export class Food {
     public position: GridPosition

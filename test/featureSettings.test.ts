@@ -161,3 +161,26 @@ test('list() shows lobbyAmbience', () => {
   createFeatureSettings(new MemoryStorage(), out).list();
   assert.match(out.lines.join('\n'), /feature\.lobbyAmbience = true.*true \| false/);
 });
+
+test('assetTheme defaults to classic, persists, and an unknown value warns and falls back to classic', () => {
+  const storage = new MemoryStorage();
+  const out = quietLog();
+  const feature = createFeatureSettings(storage, out);
+  assert.equal(feature.assetTheme, 'classic');
+
+  feature.assetTheme = 'classic';
+  assert.equal(createFeatureSettings(storage, quietLog()).assetTheme, 'classic');
+
+  feature.assetTheme = 'neon' as never;
+  assert.equal(feature.assetTheme, 'classic');
+  assert.match(out.lines.join('\n'), /assetTheme.*neon/);
+
+  storage.setItem('feature', JSON.stringify({ assetTheme: 3 }));
+  assert.equal(createFeatureSettings(storage, quietLog()).assetTheme, 'classic');
+});
+
+test('list() shows assetTheme with its allowed values', () => {
+  const out = quietLog();
+  createFeatureSettings(new MemoryStorage(), out).list();
+  assert.match(out.lines.join('\n'), /feature\.assetTheme = 'classic'.*'classic'/);
+});

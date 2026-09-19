@@ -1,6 +1,7 @@
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
+import { FOOD_TYPES, foodTexturePath } from '../foodTextures';
 import { LocalScoresManager } from '../utils/localScoresManager';
 import { ClientIdManager } from '../utils/clientIdManager';
 import { ColourPanel } from '../ColourPanel';
@@ -154,13 +155,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('redApple', 'assets/images/food/tile000.png');
-    this.load.image('greenApple', 'assets/images/food/tile001.png');
-    this.load.image('yellowApple', 'assets/images/food/tile002.png');
-    this.load.image('strawberry', 'assets/images/food/tile027.png');
-    this.load.image('cherry', 'assets/images/food/tile204.png');
-    this.load.image('chili', 'assets/images/food/tile068.png');
-    this.load.image('banana', 'assets/images/food/tile045.png');
+    this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      const key = String(file.key);
+      if ((FOOD_TYPES as readonly string[]).includes(key)) {
+        console.warn(`[assets] failed to load food texture '${key}' from theme '${feature.assetTheme}' (${file.url})`);
+      }
+    });
+    for (const type of FOOD_TYPES) {
+      this.load.image(type, foodTexturePath(feature.assetTheme, type));
+    }
     for (let i = 1; i <= 91; i++) {
       this.load.image(`${i}`, `assets/images/backgrounds/color_background_${i}.png`);
     }
