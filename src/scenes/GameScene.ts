@@ -631,7 +631,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Connection dropped: restart into a fresh lobby (no leftover snakes, food or overlays); create() rejoins a new room. */
   onConnectionLost() {
+    this.destroyLobbyAmbience();
+    this.scene.restart();
+  }
+
+  onReconnecting() {
     this.reconnectText?.destroy();
     this.reconnectText = this.add.text(HEADER.paddingX, HEADER_BOTTOM + 4, 'Reconnecting...', {
       fontSize: '20px',

@@ -200,8 +200,11 @@ class SocketManager {
 
     console.warn("[SocketManager] Room connection lost, code:", code);
     this.stopPingMeasurement();
+    // The old room is gone for good (rooms lock once a countdown starts), so rather than resuming a half-drawn
+    // round the scene restarts into a fresh lobby, whose create() joins a new room through normal matchmaking.
+    // Failed attempts still go through scheduleReconnect's retry/backoff.
+    this.room = null;
     this.lastConnectArgs?.scene.onConnectionLost?.();
-    this.scheduleReconnect();
   }
 
   private scheduleReconnect() {
@@ -216,6 +219,7 @@ class SocketManager {
     }
 
     this.reconnectAttempts++;
+    this.lastConnectArgs.scene.onReconnecting?.();
     console.log(`[SocketManager] Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelayMs}ms`);
 
     this.reconnectTimeoutHandle = window.setTimeout(() => {
