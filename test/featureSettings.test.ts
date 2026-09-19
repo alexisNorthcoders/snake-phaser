@@ -162,25 +162,25 @@ test('list() shows lobbyAmbience', () => {
   assert.match(out.lines.join('\n'), /feature\.lobbyAmbience = true.*true \| false/);
 });
 
-test('assetTheme defaults to classic, persists, and an unknown value warns and falls back to classic', () => {
+test('assetTheme defaults to goblin-treasure, persists, and an unknown value warns and falls back to goblin-treasure', () => {
   const storage = new MemoryStorage();
   const out = quietLog();
   const feature = createFeatureSettings(storage, out);
-  assert.equal(feature.assetTheme, 'classic');
+  assert.equal(feature.assetTheme, 'goblin-treasure');
 
   feature.assetTheme = 'classic';
   assert.equal(createFeatureSettings(storage, quietLog()).assetTheme, 'classic');
 
   feature.assetTheme = 'neon' as never;
-  assert.equal(feature.assetTheme, 'classic');
+  assert.equal(feature.assetTheme, 'goblin-treasure');
   assert.match(out.lines.join('\n'), /assetTheme.*neon/);
 
   storage.setItem('feature', JSON.stringify({ assetTheme: 3 }));
-  assert.equal(createFeatureSettings(storage, quietLog()).assetTheme, 'classic');
+  assert.equal(createFeatureSettings(storage, quietLog()).assetTheme, 'goblin-treasure');
 });
 
 test('list() shows assetTheme with its allowed values', () => {
   const out = quietLog();
   createFeatureSettings(new MemoryStorage(), out).list();
-  assert.match(out.lines.join('\n'), /feature\.assetTheme = 'classic'.*'classic'/);
+  assert.match(out.lines.join('\n'), /feature\.assetTheme = 'goblin-treasure'.*'classic' \| 'goblin-treasure'/);
 });
