@@ -1,6 +1,7 @@
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { computeAuthModalLayout, type Box } from './authModalLayout';
 import { migrateAnonymousScores } from './scoreMigrationHelper';
+import { FONT_FAMILY } from '../font';
 
 export interface AuthModalConfig {
   /** Form the overlay opens on. Back closes the overlay. */
@@ -63,6 +64,7 @@ class AuthModalManager {
     const input = (box: Box, type: string) => {
       const field = new InputText(scene, box.x, box.y, box.width, box.height, {
         backgroundColor: '#333',
+        fontFamily: FONT_FAMILY,
         fontSize: '18px',
         color: '#fff',
         type,

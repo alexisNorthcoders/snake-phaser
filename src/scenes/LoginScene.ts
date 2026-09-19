@@ -2,6 +2,7 @@ import InputText from "phaser3-rex-plugins/plugins/inputtext";
 import { ClientIdManager } from "../utils/clientIdManager";
 import { migrateAnonymousScores } from "../utils/scoreMigrationHelper";
 import { isGuest } from "../userData";
+import { FONT_FAMILY } from "../font";
 
 export class LoginScene extends Phaser.Scene {
     private passwordText!: InputText
@@ -53,10 +54,10 @@ export class LoginScene extends Phaser.Scene {
         this.add.text(100, 150, 'Username:', { fontSize: '24px', color: '#fff' });
         this.add.text(100, 300, 'Password:', { fontSize: '24px', color: '#fff' });
 
-        this.passwordText = new InputText(this, 310, 310, 150, 40, { backgroundColor: '#333', fontSize: '24px', color: '#fff', type: 'password' })
+        this.passwordText = new InputText(this, 310, 310, 150, 40, { backgroundColor: '#333', fontFamily: FONT_FAMILY, fontSize: '24px', color: '#fff', type: 'password' })
         this.add.existing(this.passwordText);
 
-        this.usernameText = new InputText(this, 310, 160, 150, 40, { backgroundColor: '#333', fontSize: '24px', color: '#fff', type: 'text' })
+        this.usernameText = new InputText(this, 310, 160, 150, 40, { backgroundColor: '#333', fontFamily: FONT_FAMILY, fontSize: '24px', color: '#fff', type: 'text' })
         this.add.existing(this.usernameText);
 
         this.usernameText.setFocus()

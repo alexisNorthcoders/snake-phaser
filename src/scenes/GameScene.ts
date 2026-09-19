@@ -15,6 +15,7 @@ import { createAccountAppearanceStore, createAppearanceStore, type AccountAppear
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
+import { FONT_FAMILY } from '../font';
 
 interface SnakeColors {
   head: string;
@@ -99,6 +100,7 @@ export class GameScene extends Phaser.Scene {
     this.nameLabel = this.add.text(300, 460, 'Name:', { fontSize: '20px', color: '#ffffff' }).setOrigin(1, 0.5);
     this.nameField = new InputText(this, 410, 460, 160, 34, {
       backgroundColor: '#333',
+      fontFamily: FONT_FAMILY,
       fontSize: '20px',
       color: '#fff',
       type: 'text',
