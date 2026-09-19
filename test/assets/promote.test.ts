@@ -57,3 +57,20 @@ test('a subset can be re-promoted when other slots already exist', async () => {
   assert.equal(m.slots.cherry?.timestamp, '2026-02-01T00:00:00.000Z')
   assert.equal(m.slots.banana?.timestamp, '2026-01-01T00:00:00.000Z')
 })
+
+test('parsePicks accepts sheet candidates as s<n>', () => {
+  const { picks, errors } = parsePicks(['redApple=s3', 'cherry=2', 'banana=s0'])
+  assert.deepEqual(picks, { redApple: { sheet: 3 }, cherry: 2 })
+  assert.equal(errors.length, 1)
+})
+
+test('promote can assign any sheet candidate to a slot, and still requires every slot', async () => {
+  const { outputDir, publicDir, themeDir } = await setup()
+  await writeFile(`${outputDir}/food/sheet-5.png`, Buffer.concat([PNG_SIGNATURE, Buffer.from('sheet5')]))
+  await assert.rejects(promote({ theme, picks: { cherry: { sheet: 5 } }, outputDir, publicDir }), /redApple: no pick/)
+  await assert.rejects(readdir(themeDir))
+  const m = await promote({ theme, picks: { ...allPicks, cherry: { sheet: 5 }, banana: { sheet: 9 } } as any, outputDir, publicDir }).catch((e) => e)
+  assert.match(String(m), /banana: candidate s9 is missing/)
+  await promote({ theme, picks: { ...allPicks, cherry: { sheet: 5 } }, outputDir, publicDir })
+  assert.deepEqual(await readFile(`${themeDir}/food/cherry.png`), Buffer.concat([PNG_SIGNATURE, Buffer.from('sheet5')]))
+})

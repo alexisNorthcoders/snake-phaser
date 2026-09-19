@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { theme } from '../../tools/assets/themes/goblin-treasure.ts'
 import { FOOD_TYPES } from '../../tools/assets/theme.ts'
-import { buildPrompt } from '../../tools/assets/prompt.ts'
+import { buildPrompt, buildSheetPrompt } from '../../tools/assets/prompt.ts'
 import { resolveSlots, renderContactSheet } from '../../tools/assets/candidates.ts'
 
 test('prompt is the description plus the stated background, with no style words', () => {
@@ -30,4 +30,19 @@ test('contact sheet labels each candidate and links raw renders', () => {
   assert.match(html, /href="raw\/banana-2\.png"/)
   assert.ok(html.indexOf('banana #1') < html.indexOf('banana #2'))
   assert.doesNotMatch(html, /cherry/)
+})
+
+test('sheet prompt names every food item on the flat background with no shadows or text', () => {
+  const prompt = buildSheetPrompt(theme)
+  for (const slot of FOOD_TYPES) assert.ok(prompt.includes(theme.food[slot]))
+  assert.match(prompt, /flat plain white background/)
+  assert.match(prompt, /no shadows, no text/)
+})
+
+test('contact sheet lists numbered sheet candidates', () => {
+  const html = renderContactSheet('t', [], [2, 1])
+  assert.match(html, /sheet #1/)
+  assert.match(html, /src="food\/sheet-2\.png" width="128"/)
+  assert.match(html, /href="raw\/sheet-2\.png"/)
+  assert.ok(html.indexOf('sheet #1') < html.indexOf('sheet #2'))
 })
