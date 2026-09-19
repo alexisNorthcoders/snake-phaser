@@ -1,4 +1,4 @@
-import { computeGameOverLayout } from '../utils/gameOverLayout';
+import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_ROW_HEIGHT } from '../utils/gameOverLayout';
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
@@ -80,7 +80,7 @@ export class GameScene extends Phaser.Scene {
   private nameField?: InputText;
   private nameLabel?: Phaser.GameObjects.Text;
   private nameFieldFrame?: Phaser.GameObjects.Graphics;
-  private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
+  private gameOverObjects: { setVisible(visible: boolean): unknown; destroy(): void }[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
   private leaderboardPanel?: LeaderboardPanel;
 
@@ -519,113 +519,96 @@ export class GameScene extends Phaser.Scene {
 
   private async displayGameOverScreen(payload: GameOverPayload) {
     const topScores: HighScore[] = (await getHighScores()).slice(0, 3);
-
-    const { centerX: PANEL_CENTER_X, panelWidth: PANEL_WIDTH } = computeGameOverLayout(this.scale.width);
-    const TITLE_Y = 170;
-    const RANKINGS_START_Y = 220;
-    const ROW_HEIGHT = 28;
-    const SECTION_GAP = 20;
-    const BUTTON_GAP = 30;
-    const SAVE_SCORE_GAP = 50;
-    const PANEL_TOP_PADDING = 30;
-    const PANEL_BOTTOM_PADDING = 40;
-
     const rankings = payload?.rankings ?? [];
-    const rankingsEndY = rankings.length > 0
-      ? RANKINGS_START_Y + (rankings.length - 1) * ROW_HEIGHT
-      : RANKINGS_START_Y - ROW_HEIGHT;
+    const sessionId = socketManager.getRoom()?.sessionId;
 
-    const topScoresHeaderY = rankingsEndY + ROW_HEIGHT + SECTION_GAP;
-    const topScoresStartY = topScoresHeaderY + ROW_HEIGHT;
-    const rowCount = Math.max(topScores.length, 1);
-    const topScoresEndY = topScoresStartY + (rowCount - 1) * ROW_HEIGHT;
-    const playAgainY = topScoresEndY + ROW_HEIGHT + BUTTON_GAP;
-    const saveScoreY = playAgainY + SAVE_SCORE_GAP;
+    const { centerX, panelWidth } = computeGameOverLayout(this.scale.width);
+    const c = computeGameOverContentLayout(rankings.length, topScores.length, this.guest);
+    const panelX = centerX - panelWidth / 2;
+    const panelY = Math.max(0, (this.scale.height - c.panelHeight) / 2);
+    const contentX = panelX + c.padding;
+    const contentWidth = panelWidth - 2 * c.padding;
+    const DEPTH = 20;
 
-    const panelTopY = TITLE_Y - PANEL_TOP_PADDING;
-    const panelBottomY = (this.guest ? saveScoreY : playAgainY) + PANEL_BOTTOM_PADDING;
-    const panelCenterY = (panelTopY + panelBottomY) / 2;
+    const frame = new FramedPanel(this, panelX, panelY, panelWidth, c.panelHeight, 0.8);
+    frame.addDivider(contentX, panelY + c.dividerY, contentWidth);
+    frame.setDepth(DEPTH);
+    this.gameOverObjects.push(frame);
 
-    const panel = this.add.rectangle(PANEL_CENTER_X, panelCenterY, PANEL_WIDTH, panelBottomY - panelTopY, 0x000000, 0.8).setOrigin(0.5).setDepth(20);
+    const addText = (x: number, y: number, text: string, fontSize: number, color: string, originX = 0.5) => {
+      const t = this.add
+        .text(x, y, text, { fontFamily: FONT_FAMILY, fontSize: `${fontSize}px`, color })
+        .setOrigin(originX, 0.5)
+        .setScrollFactor(0)
+        .setDepth(DEPTH);
+      this.gameOverObjects.push(t);
+      return t;
+    };
 
-    const title = this.add.text(PANEL_CENTER_X, TITLE_Y, 'GAME OVER', {
-      fontSize: '32px',
-      color: '#ff4444',
-    }).setOrigin(0.5).setDepth(20);
+    // Hard 4px/4px shadow behind the title
+    addText(centerX + 4, panelY + c.titleY + 20 + 4, 'GAME OVER', 32, '#ff4444').setAlpha(0.35);
+    addText(centerX, panelY + c.titleY + 20, 'GAME OVER', 32, '#ff4444');
 
-    this.gameOverObjects.push(panel, title);
+    const addRow = (index: number, name: string, score: number, y: number, color: string) => {
+      addText(contentX, y, `#${index + 1}`, 20, color, 0);
+      addText(contentX + 56, y, name, 20, color, 0);
+      addText(contentX + contentWidth, y, String(score), 20, color, 1);
+    };
 
-    rankings.forEach((entry, index) => {
-      const line = this.add.text(PANEL_CENTER_X, RANKINGS_START_Y + index * ROW_HEIGHT, `#${index + 1}: ${entry.name} - ${entry.score}`, {
-        fontSize: '20px',
-        color: '#ffffff',
-      }).setOrigin(0.5).setDepth(20);
-      this.gameOverObjects.push(line);
+    rankings.forEach((entry, i) => {
+      const y = panelY + c.roomRowsY + i * GAME_OVER_ROW_HEIGHT + GAME_OVER_ROW_HEIGHT / 2;
+      addRow(i, entry.name, entry.score, y, entry.id === sessionId ? '#ffff00' : '#ffffff');
     });
 
-    const topScoresHeader = this.add.text(PANEL_CENTER_X, topScoresHeaderY, 'TOP SCORES', {
-      fontSize: '22px',
-      color: '#ff4444',
-    }).setOrigin(0.5).setDepth(20);
-    this.gameOverObjects.push(topScoresHeader);
+    addText(centerX, panelY + c.subheadingY + 16, 'Top scores', 22, '#ff4444');
 
     if (topScores.length > 0) {
-      topScores.forEach((hs, index) => {
-        const line = this.add.text(PANEL_CENTER_X, topScoresStartY + index * ROW_HEIGHT, `#${index + 1}: ${hs.username} - ${hs.score}`, {
-          fontSize: '20px',
-          color: '#ffffff',
-        }).setOrigin(0.5).setDepth(20);
-        this.gameOverObjects.push(line);
+      topScores.forEach((hs, i) => {
+        addRow(i, hs.username, hs.score, panelY + c.topRowsY + i * GAME_OVER_ROW_HEIGHT + GAME_OVER_ROW_HEIGHT / 2, '#ffffff');
       });
     } else {
-      const emptyLine = this.add.text(PANEL_CENTER_X, topScoresStartY, 'No high scores yet', {
-        fontSize: '18px',
-        color: '#aaaaaa',
-      }).setOrigin(0.5).setDepth(20);
-      this.gameOverObjects.push(emptyLine);
+      addText(centerX, panelY + c.topRowsY + GAME_OVER_ROW_HEIGHT / 2, 'No high scores yet', 18, '#aaaaaa');
     }
 
-    const playAgainButton = this.add.text(PANEL_CENTER_X, playAgainY, 'PLAY AGAIN', {
-      fontSize: '24px',
-      backgroundColor: '#00AA00',
-      color: '#FFFFFF',
-      padding: { x: 10, y: 5 },
-    })
-      .setOrigin(0.5)
-      .setDepth(20)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerover', () => playAgainButton.setStyle({ backgroundColor: '#00CC00' }))
-      .on('pointerout', () => playAgainButton.setStyle({ backgroundColor: '#00AA00' }))
-      .on('pointerdown', () => {
+    const b = GAME_OVER_BUTTON;
+    const buttonX = centerX - b.width / 2;
+    const playAgain = new PixelButton(this, {
+      x: buttonX,
+      y: panelY + c.playAgainY,
+      width: b.width,
+      height: b.height,
+      label: 'Play Again',
+      size: 'large',
+      fill: 'action',
+      fontSize: 24,
+      onClick: () => {
         this.clearGameOverOverlay();
         this.isGameOver = false;
         this.clearSnakesAndFood();
         socketManager.send({ event: 'startGame' });
-      });
+      },
+    }).setDepth(DEPTH);
+    this.gameOverObjects.push(playAgain);
 
-    this.gameOverObjects.push(playAgainButton);
-
-    if (this.guest) {
-      const saveScoreButton = this.add.text(PANEL_CENTER_X, saveScoreY, 'SAVE SCORE', {
-        fontSize: '24px',
-        backgroundColor: '#555555',
-        color: '#FFFFFF',
-        padding: { x: 10, y: 5 },
-      })
-        .setOrigin(0.5)
-        .setDepth(20)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerover', () => saveScoreButton.setStyle({ backgroundColor: '#777777' }))
-        .on('pointerout', () => saveScoreButton.setStyle({ backgroundColor: '#555555' }))
-        .on('pointerdown', () => this.openSaveScore());
-
-      this.gameOverObjects.push(saveScoreButton);
+    if (c.saveScoreY !== undefined) {
+      const saveScore = new PixelButton(this, {
+        x: buttonX,
+        y: panelY + c.saveScoreY,
+        width: b.width,
+        height: b.height,
+        label: 'Save Score',
+        size: 'large',
+        fill: 'button-alt',
+        fontSize: 24,
+        onClick: () => this.openSaveScore(),
+      }).setDepth(DEPTH);
+      this.gameOverObjects.push(saveScore);
     }
   }
 
   /** Hidden objects receive no pointer input, so the panel is inert while hidden. */
   private setGameOverPanelVisible(visible: boolean) {
-    this.gameOverObjects.forEach((obj) => (obj as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Visible).setVisible(visible));
+    this.gameOverObjects.forEach((obj) => obj.setVisible(visible));
   }
 
   private clearGameOverOverlay() {

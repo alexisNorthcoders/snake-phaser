@@ -81,6 +81,13 @@ export class PixelButton {
     return this;
   }
 
+  setDepth(depth: number): this {
+    this.gfx.setDepth(depth);
+    this.text.setDepth(depth);
+    this.zone.setDepth(depth);
+    return this;
+  }
+
   setVisible(visible: boolean): this {
     this.gfx.setVisible(visible);
     this.text.setVisible(visible);
