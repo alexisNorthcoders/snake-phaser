@@ -20,6 +20,7 @@ import { FONT_FAMILY } from '../font';
 import { PixelButton } from '../PixelButton';
 import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
 import { FramedPanel } from '../FramedPanel';
+import { LeaderboardPanel } from '../LeaderboardPanel';
 import { LOBBY_PANEL, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
@@ -81,8 +82,7 @@ export class GameScene extends Phaser.Scene {
   private nameFieldFrame?: Phaser.GameObjects.Graphics;
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
-  private leaderboardObjects: Phaser.GameObjects.GameObject[] = [];
-  private leaderboardRefreshButton?: Phaser.GameObjects.Text;
+  private leaderboardPanel?: LeaderboardPanel;
 
   constructor() {
     super('GameScene');
@@ -367,7 +367,7 @@ export class GameScene extends Phaser.Scene {
         this.sendColorUpdate();
       });
     }
-    this.displayLeaderboard();
+    this.createLeaderboardPanel();
 
     if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this, () => this.snakeColors);
 
@@ -451,91 +451,17 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private displayTopLocalScores(): void {
-    const topScores = LocalScoresManager.getTopScores(5);
-
-    if (topScores.length > 0) {
-      const SCORES_X = 400;
-      let SCORES_Y = 495;
-
-      const header = this.add.text(SCORES_X, SCORES_Y, 'YOUR TOP SCORES:', {
-        fontSize: '18px',
-        color: '#ffff00',
-      }).setOrigin(0.5, 0);
-      this.leaderboardObjects.push(header);
-
-      SCORES_Y += 25;
-      topScores.forEach((score, index) => {
-        const date = new Date(score.timestamp).toLocaleDateString();
-        const text = this.add.text(SCORES_X, SCORES_Y + index * 20, `#${index + 1}: ${score.score} (${date})`, {
-          fontSize: '16px',
-          color: '#ffffff',
-        }).setOrigin(0.5, 0);
-        this.leaderboardObjects.push(text);
-      });
-    }
-  }
-
-  private async displayLeaderboard(): Promise<void> {
-    if (this.guest) {
-      this.displayTopLocalScores();
-      return;
-    }
-
-    const leaderboard = await getLeaderboard();
-    // The round may have started while the fetch was in flight
-    if (this.gameStarted) return;
-    const topLeaderboard = leaderboard.slice(0, 10);
-
-    const BOARD_X = 50;
-    let BOARD_Y = 310;
-
-    const header = this.add.text(BOARD_X, BOARD_Y, 'GLOBAL LEADERBOARD', {
-      fontSize: '18px',
-      color: '#ffff00',
+  private createLeaderboardPanel(): void {
+    this.destroyLeaderboardPanel();
+    this.leaderboardPanel = new LeaderboardPanel(this, {
+      fetchGlobal: getLeaderboard,
+      loadMine: () => LocalScoresManager.getTopScores(5),
     });
-    this.leaderboardObjects.push(header);
-
-    BOARD_Y += 28;
-
-    if (topLeaderboard.length > 0) {
-      topLeaderboard.forEach((entry, index) => {
-        const text = this.add.text(BOARD_X, BOARD_Y + index * 22, `#${index + 1}: ${entry.username} - ${entry.score}`, {
-          fontSize: '14px',
-          color: '#ffffff',
-        });
-        this.leaderboardObjects.push(text);
-      });
-    } else {
-      const emptyText = this.add.text(BOARD_X, BOARD_Y, 'No scores yet', {
-        fontSize: '14px',
-        color: '#aaaaaa',
-      });
-      this.leaderboardObjects.push(emptyText);
-    }
-
-    BOARD_Y += topLeaderboard.length * 22 + 15;
-    this.leaderboardRefreshButton = this.add.text(BOARD_X, BOARD_Y, 'Refresh Leaderboard', {
-      fontSize: '14px',
-      color: '#00ff00',
-      backgroundColor: '#222',
-      padding: { x: 8, y: 4 },
-    })
-      .setInteractive({ useHandCursor: true })
-      .on('pointerover', () => this.leaderboardRefreshButton?.setStyle({ backgroundColor: '#444' }))
-      .on('pointerout', () => this.leaderboardRefreshButton?.setStyle({ backgroundColor: '#222' }))
-      .on('pointerdown', () => {
-        this.clearLeaderboard();
-        this.displayLeaderboard();
-      });
-
-    this.leaderboardObjects.push(this.leaderboardRefreshButton);
   }
 
-  private clearLeaderboard(): void {
-    this.leaderboardObjects.forEach((obj) => obj.destroy());
-    this.leaderboardObjects = [];
-    this.leaderboardRefreshButton = undefined;
+  private destroyLeaderboardPanel(): void {
+    this.leaderboardPanel?.destroy();
+    this.leaderboardPanel = undefined;
   }
 
   startGame() {
@@ -556,8 +482,8 @@ export class GameScene extends Phaser.Scene {
     // Remove color customization swatches
     this.destroyColourPanel();
 
-    // Remove the scores list (local scores or global leaderboard + Refresh button)
-    this.clearLeaderboard();
+    // Remove the leaderboard panel; a fetch still in flight then draws nothing
+    this.destroyLeaderboardPanel();
 
     // Remove game-over overlay, if a new round is starting from it
     this.clearGameOverOverlay();
@@ -810,8 +736,6 @@ export class GameScene extends Phaser.Scene {
     this.gameOverObjects = [];
     this.scoreboardTexts = new Map();
     this.scoreboardVisible = false;
-    this.leaderboardObjects = [];
-    this.leaderboardRefreshButton = undefined;
   }
 
   shutdown() {
@@ -822,7 +746,7 @@ export class GameScene extends Phaser.Scene {
     this.clearSnakesAndFood();
     this.clearGameOverOverlay();
     this.clearScoreboard();
-    this.clearLeaderboard();
+    this.destroyLeaderboardPanel();
     authModalManager.close();
 
     // Remove keyboard listeners
