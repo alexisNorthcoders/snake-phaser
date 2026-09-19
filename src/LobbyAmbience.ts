@@ -6,9 +6,11 @@ import { createAmbience, type Ambience } from './ambience';
 import type { Appearance } from './appearanceStore';
 
 const ALPHA = 0.6;
-/** Above the background tile (depth -2), below every lobby UI object (depth 0). */
+/** Above the background (depth -2) and its dimming (-1.5), below every lobby UI object (depth 0). */
 export const AMBIENCE_DEPTH = -1;
 export const BACKGROUND_DEPTH = -2;
+/** Between the background and everything drawn on it, so only the background is dimmed. */
+export const BACKGROUND_DIM_DEPTH = -1.5;
 
 const FRUIT_KEYS = ['redApple', 'greenApple', 'yellowApple', 'cherry', 'banana'];
 
