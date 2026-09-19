@@ -1,4 +1,5 @@
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
+import { computeAuthModalLayout, type Box } from './authModalLayout';
 import { migrateAnonymousScores } from './scoreMigrationHelper';
 
 export interface AuthModalConfig {
@@ -53,18 +54,31 @@ class AuthModalManager {
     this.state.objects.forEach(obj => obj.destroy());
     this.state.objects = [];
 
-    const PANEL_CENTER_X = 400;
-    const PANEL_WIDTH = 360;
-    const PANEL_TOP_Y = 150;
-    const PANEL_BOTTOM_Y = 550;
-    const panelCenterY = (PANEL_TOP_Y + PANEL_BOTTOM_Y) / 2;
+    const layout = computeAuthModalLayout(scene.scale.width, scene.scale.height, !!cfg.subtitle);
+    const { panel: panelBox } = layout;
+    const label = (box: Box, text: string) => {
+      const t = scene.add.text(box.x, box.y, text, { fontSize: '18px', color: '#fff' }).setOrigin(0.5).setDepth(30);
+      this.state.objects.push(t);
+    };
+    const input = (box: Box, type: string) => {
+      const field = new InputText(scene, box.x, box.y, box.width, box.height, {
+        backgroundColor: '#333',
+        fontSize: '18px',
+        color: '#fff',
+        type,
+      });
+      scene.add.existing(field);
+      field.setDepth(30);
+      this.state.objects.push(field);
+      return field;
+    };
 
-    const panel = scene.add.rectangle(PANEL_CENTER_X, panelCenterY, PANEL_WIDTH, PANEL_BOTTOM_Y - PANEL_TOP_Y, 0x000000, 0.9)
-      .setOrigin(0.5)
+    const panel = scene.add.rectangle(panelBox.x, panelBox.y, panelBox.width, panelBox.height, 0x000000, 1)
+      .setStrokeStyle(2, 0x00ff00)
       .setDepth(30);
     this.state.objects.push(panel);
 
-    const title = scene.add.text(PANEL_CENTER_X, 170, cfg.title ?? (this.isRegistering ? 'CREATE ACCOUNT' : 'LOGIN'), {
+    const title = scene.add.text(layout.title.x, layout.title.y, cfg.title ?? (this.isRegistering ? 'CREATE ACCOUNT' : 'LOGIN'), {
       fontSize: '24px',
       color: '#00ff00',
     })
@@ -72,11 +86,11 @@ class AuthModalManager {
       .setDepth(30);
     this.state.objects.push(title);
 
-    if (cfg.subtitle) {
-      const subtitle = scene.add.text(PANEL_CENTER_X, 198, cfg.subtitle, {
+    if (cfg.subtitle && layout.subtitle) {
+      const subtitle = scene.add.text(layout.subtitle.x, layout.subtitle.y, cfg.subtitle, {
         fontSize: '14px',
         color: '#cccccc',
-        wordWrap: { width: 320 },
+        wordWrap: { width: layout.textWidth },
         align: 'center',
       })
         .setOrigin(0.5)
@@ -84,42 +98,22 @@ class AuthModalManager {
       this.state.objects.push(subtitle);
     }
 
-    scene.add.text(100, 220, 'Username:', { fontSize: '18px', color: '#fff' }).setDepth(30);
-    this.state.objects.push(scene.children.list[scene.children.list.length - 1]);
+    label(layout.usernameLabel, 'Username');
+    this.usernameText = input(layout.usernameInput, 'text');
+    label(layout.passwordLabel, 'Password');
+    this.passwordText = input(layout.passwordInput, 'password');
 
-    this.usernameText = new InputText(scene, 260, 230, 180, 35, {
-      backgroundColor: '#333',
-      fontSize: '18px',
-      color: '#fff',
-      type: 'text',
-    });
-    scene.add.existing(this.usernameText);
-    this.usernameText.setDepth(30);
-    this.state.objects.push(this.usernameText);
-
-    scene.add.text(100, 280, 'Password:', { fontSize: '18px', color: '#fff' }).setDepth(30);
-    this.state.objects.push(scene.children.list[scene.children.list.length - 1]);
-
-    this.passwordText = new InputText(scene, 260, 290, 180, 35, {
-      backgroundColor: '#333',
-      fontSize: '18px',
-      color: '#fff',
-      type: 'password',
-    });
-    scene.add.existing(this.passwordText);
-    this.passwordText.setDepth(30);
-    this.state.objects.push(this.passwordText);
-
-    this.errorText = scene.add.text(PANEL_CENTER_X, 340, '', {
+    this.errorText = scene.add.text(layout.error.x, layout.error.y, '', {
       fontSize: '14px',
       color: '#ff4444',
-      wordWrap: { width: 320 },
+      wordWrap: { width: layout.textWidth },
+      align: 'center',
     })
       .setOrigin(0.5)
       .setDepth(30);
     this.state.objects.push(this.errorText);
 
-    const submitButton = scene.add.text(PANEL_CENTER_X, 400, this.isRegistering ? 'Register' : 'Login', {
+    const submitButton = scene.add.text(layout.submit.x, layout.submit.y, this.isRegistering ? 'Register' : 'Login', {
       fontSize: '18px',
       backgroundColor: '#00aa00',
       color: '#ffffff',
@@ -135,7 +129,7 @@ class AuthModalManager {
       });
     this.state.objects.push(submitButton);
 
-    const toggleButton = scene.add.text(PANEL_CENTER_X, 450, this.isRegistering ? 'Already have an account? Login' : 'Need an account? Register', {
+    const toggleButton = scene.add.text(layout.toggle.x, layout.toggle.y, this.isRegistering ? 'Already have an account? Login' : 'Need an account? Register', {
       fontSize: '14px',
       color: '#00ffff',
     })
@@ -148,7 +142,7 @@ class AuthModalManager {
       });
     this.state.objects.push(toggleButton);
 
-    const backButton = scene.add.text(PANEL_CENTER_X, 490, 'Back', {
+    const backButton = scene.add.text(layout.back.x, layout.back.y, 'Back', {
       fontSize: '14px',
       color: '#cccccc',
     })
