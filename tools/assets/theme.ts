@@ -5,10 +5,12 @@ export { FOOD_TYPES, type FoodType }
 export const DEFAULT_PROVIDER: RetroDiffusionProvider = { kind: 'retro-diffusion', style: 'rd_fast__mc_item' }
 export const DEFAULT_BACKDROP = 'plain white'
 
-/** Background tiles are generated at this edge length and repeated 1:1 by the game's tile sprite. */
-export const BACKGROUND_SIZE = 64
-/** Seamless-tiling style with a batch of 4; `rd_tile__single_tile` also tiles but renders one image per paid request. */
-export const DEFAULT_BACKGROUND_STYLE = 'rd_fast__texture'
+/** Edge length of the block the background is built from; the MC texture styles cap at 128. */
+export const BACKGROUND_TILE_SIZE = 128
+/** The shipped background, filled by repeating the block: the board is square at 800 on desktop. */
+export const BACKGROUND_BOARD_SIZE = 800
+/** The texture-style sibling of the food's `rd_fast__mc_item`, so the board reads as one set. */
+export const DEFAULT_BACKGROUND_STYLE = 'rd_fast__mc_texture'
 
 export const DEFAULT_SHEET_MODEL = 'black-forest-labs/FLUX-1-schnell'
 
@@ -32,11 +34,11 @@ export function providerModel(provider: Provider): string {
     return provider.kind === 'retro-diffusion' ? provider.style : (provider.model ?? DEFAULT_SHEET_MODEL)
 }
 
-/** A theme's game background: one seamless tile, repeated across the board. */
+/** A theme's game background: one block texture, repeated to fill the board. */
 export interface Background {
-    /** Tile description; as with food, the style supplies the pixel-art look, so no style words belong here. */
+    /** Block description; as with food, the style supplies the pixel-art look, so no style words belong here. */
     description: string
-    /** Retro Diffusion `prompt_style`; defaults to DEFAULT_BACKGROUND_STYLE. It must support seamless tiling. */
+    /** Retro Diffusion `prompt_style`; defaults to DEFAULT_BACKGROUND_STYLE. */
     style?: string
 }
 
@@ -46,7 +48,7 @@ export interface Theme {
     provider?: Provider
     /** Flat colour stated in every food prompt (removed by the provider); defaults to DEFAULT_BACKDROP. */
     backdrop?: string
-    /** The single seamless tile the game repeats behind the board. */
+    /** The single image drawn behind the board. */
     background: Background
     /** Optional palette image (path from the repo root, committed with the theme) shared by every sprite so they look like one set. */
     palette?: string

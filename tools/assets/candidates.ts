@@ -7,9 +7,9 @@ export function candidateFile(slot: FoodType, index: number): string {
     return `${slot}-${index}.png`
 }
 
-/** Background candidates are numbered across every run: `tile-<n>.png`. */
+/** Background candidates are numbered across every run: `background-<n>.png`. */
 export function backgroundCandidateFile(index: number): string {
-    return `tile-${index}.png`
+    return `background-${index}.png`
 }
 
 /** Sheet candidates are numbered across every sheet generated so far: `sheet-<n>.png`. */
@@ -60,15 +60,15 @@ export function renderContactSheet(
             const img = `food/${sheetCandidateFile(index)}`
             return `<figure><div class="board"><img src="${img}" width="32" height="32" alt="${label} 1x"><img src="${img}" width="128" height="128" alt="${label} 4x"></div><figcaption>${label} · <a href="raw/${sheetCandidateFile(index)}">raw</a></figcaption></figure>`
         })
-    // Each tile is shown alone and repeated: seams only show up once it tiles.
+    // Shown at a quarter of the board so several fit side by side; the link opens the shipped pixels.
     const backgroundCells = [...backgroundCandidates]
         .sort((a, b) => a - b)
         .map((index) => {
-            const label = `tile #${index}`
+            const label = `background #${index}`
             const img = `background/${backgroundCandidateFile(index)}`
-            return `<figure><div class="tiles"><img src="${img}" width="64" height="64" alt="${label} 1x"><div class="repeat" style="background-image:url(${img})"></div></div><figcaption>${label} · <a href="raw/${backgroundCandidateFile(index)}">raw</a></figcaption></figure>`
+            return `<figure><a href="${img}"><img class="bg" src="${img}" width="200" height="200" alt="${label}"></a><figcaption>${label} · <a href="raw/${backgroundCandidateFile(index)}">raw</a></figcaption></figure>`
         })
-    const backgroundSection = backgroundCells.length > 0 ? `<section><h2>background tiles</h2><div class="row">${backgroundCells.join('')}</div></section>` : ''
+    const backgroundSection = backgroundCells.length > 0 ? `<section><h2>backgrounds</h2><div class="row">${backgroundCells.join('')}</div></section>` : ''
     const sheetSection = sheetCells.length > 0 ? `<section><h2>sheet candidates</h2><div class="row">${sheetCells.join('')}</div></section>` : ''
     return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${themeName} candidates</title>
@@ -78,9 +78,7 @@ body{background:#111;color:#ddd;font-family:sans-serif;margin:1rem}
 figure{margin:0}
 .board{background:#1b2a1b;padding:8px;display:flex;align-items:flex-end;gap:12px;image-rendering:pixelated}
 .board img{image-rendering:pixelated}
-.tiles{display:flex;align-items:flex-start;gap:12px}
-.tiles img{image-rendering:pixelated}
-.repeat{width:256px;height:192px;background-repeat:repeat;image-rendering:pixelated}
+.bg{image-rendering:pixelated;display:block}
 a{color:#8cf}
 </style></head><body>
 <h1>${themeName}</h1>

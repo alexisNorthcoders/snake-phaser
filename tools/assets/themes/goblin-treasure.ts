@@ -5,7 +5,7 @@ export const theme: Theme = {
     provider: { kind: 'retro-diffusion', style: 'rd_fast__mc_item' },
     backdrop: 'plain white',
     background: {
-        description: 'a dark goblin cave floor of rough uneven flagstones, cracked grey-green stone with patches of damp moss in the gaps and scattered grit',
+        description: 'mossy cobblestone, pale grey stone cobbles with bright green moss growing between them, evenly lit and light in tone',
     },
     palette: 'tools/assets/themes/goblin-treasure.palette.png',
     size: 32,
