@@ -86,17 +86,23 @@ export class LeaderboardPanel {
   }
 
   private refresh(): void {
-    this.sources.fetchGlobal().then((entries) => {
-      if (this.destroyed) return;
-      this.globalEntries = entries;
-      this.render();
-    });
+    this.sources
+      .fetchGlobal()
+      .catch(() => [] as GlobalScoreEntry[])
+      .then((entries) => {
+        if (this.destroyed) return;
+        this.globalEntries = entries;
+        this.render();
+      });
   }
 
   private render(): void {
     this.tabTexts.forEach((text, tab) => text.setColor(tab === this.tab ? TAB_SELECTED : TAB_MUTED));
     this.clearRows();
-    if (this.tab === 'global' && !this.globalEntries) return; // still loading
+    if (this.tab === 'global' && !this.globalEntries) {
+      this.addRow(this.layout.nameX, this.layout.rowsY, 'Loading...', 0);
+      return;
+    }
     const rows = this.tab === 'global' ? globalRows(this.globalEntries!) : mineRows(this.sources.loadMine());
     if (rows.length === 0) {
       this.addRow(this.layout.nameX, this.layout.rowsY, 'No scores yet', 0);
