@@ -16,6 +16,8 @@ import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
+import { PixelButton } from '../PixelButton';
+import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
 
 interface SnakeColors {
   head: string;
@@ -47,6 +49,7 @@ export class GameScene extends Phaser.Scene {
   public scoreboardTexts: Map<string, Phaser.GameObjects.Text> = new Map();
   public scoreboardBg!: Phaser.GameObjects.Rectangle;
   public scoreboardHeader!: Phaser.GameObjects.Text;
+  private headerButton?: PixelButton;
   public scoreboardVisible: boolean = false;
   public isGameOver: boolean = false;
   public gameStarted: boolean = false;
@@ -213,24 +216,21 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setScrollFactor(0);
 
-    // Guests get Log In (opens the auth overlay on the login form); accounts get Logout.
-    const headerButton = this.add.text(700, 20, this.guest ? 'Log In' : 'Logout', {
-      fontSize: '20px',
-      color: this.guest ? '#00ff00' : '#ff0000',
-      backgroundColor: '#222',
-      padding: { x: 10, y: 5 },
-    })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerover', () => headerButton.setStyle({ backgroundColor: '#444' }))
-      .on('pointerout', () => headerButton.setStyle({ backgroundColor: '#222' }))
-      .on('pointerdown', () => {
+    // Guests get Login (opens the auth overlay on the login form); accounts get Logout.
+    this.headerButton = new PixelButton(this, {
+      ...headerButtonPosition(this.scale.width),
+      width: HEADER_BUTTON.width,
+      height: HEADER_BUTTON.height,
+      label: this.guest ? 'Login' : 'Logout',
+      labelColor: this.guest ? '#ffffff' : '#ff4444',
+      onClick: () => {
         if (this.guest) {
           this.openLogIn();
         } else {
           this.logout();
         }
-      });
+      },
+    });
 
     const SCOREBOARD_X = 600;
     const SCOREBOARD_Y = 50;
@@ -784,6 +784,8 @@ export class GameScene extends Phaser.Scene {
     this.pingText?.destroy();
     this.destroyFpsText();
     this.playerNameText?.destroy();
+    this.headerButton?.destroy();
+    this.headerButton = undefined;
     this.scoreboardBg?.destroy();
     this.scoreboardHeader?.destroy();
     this.welcomeText?.destroy();
