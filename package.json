@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test 'test/**/*.test.ts'"
+    "test": "node --test 'test/**/*.test.ts'",
+    "assets:generate": "node tools/assets/generate.ts",
+    "typecheck:tools": "tsc -p tools/assets/tsconfig.json"
   },
   "devDependencies": {
+    "@types/node": "^24.13.6",
+    "sharp": "^0.35.4",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
   },
