@@ -54,7 +54,7 @@ export class Player extends Schema {
 }
 
 export class GameState extends Schema {
-    @type("boolean") hasGameStarted: boolean = false;
+    @type("string") phase: "lobby" | "countdown" | "playing" | "ended" = "lobby";
     @type("number") aliveCount: number = 0;
     @type("number") backgroundNumber: number = 0;
     @type([Player]) players = new ArraySchema<Player>();
