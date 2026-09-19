@@ -76,7 +76,7 @@ class SocketManager {
 
       this.room.onMessage(SocketManager.messageTypes.PONG, () => {
         const latency = Date.now() - this.lastPingTime;
-        scene.pingText?.setText(`Ping: ${latency}ms`);
+        scene.setPing?.(latency);
       });
 
       // Handle state changes for snake positions and food

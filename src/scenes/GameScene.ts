@@ -10,6 +10,7 @@ import { LobbyAmbience, BACKGROUND_DEPTH } from '../LobbyAmbience';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
 import { isGuest, sessionName } from '../userData';
 import { feature, localStorageOrNothing } from '../feature';
+import { BAR_COUNT, HEADER, HEADER_BOTTOM, formatPingReadout, litBars } from '../pingSignal';
 import { createFpsMeter, formatFpsReadout } from '../fpsMeter';
 import { createAccountAppearanceStore, createAppearanceStore, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
@@ -43,9 +44,9 @@ export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
   public scoreText!: Phaser.GameObjects.Text;
   public pingText!: Phaser.GameObjects.Text;
+  private pingBars?: Phaser.GameObjects.Graphics;
   private fpsText?: Phaser.GameObjects.Text;
   private fpsMeter = createFpsMeter();
-  public playerNameText!: Phaser.GameObjects.Text;
   public scoreboardTexts: Map<string, Phaser.GameObjects.Text> = new Map();
   public scoreboardBg!: Phaser.GameObjects.Rectangle;
   public scoreboardHeader!: Phaser.GameObjects.Text;
@@ -119,7 +120,6 @@ export class GameScene extends Phaser.Scene {
   private applyNameField(): void {
     if (!this.nameField) return;
     this.name = normaliseName(this.nameField.text);
-    this.playerNameText.setText(`Player: ${this.name}`);
     this.welcomeText?.setText(`Welcome ${this.name}!`);
   }
 
@@ -127,7 +127,6 @@ export class GameScene extends Phaser.Scene {
   private commitName(): void {
     if (!this.guest || !this.nameField) return;
     this.name = nameStore.save(this.nameField.text);
-    this.playerNameText.setText(`Player: ${this.name}`);
     socketManager.send({ event: 'updatePlayer', name: this.name });
   }
 
@@ -185,17 +184,20 @@ export class GameScene extends Phaser.Scene {
       '1'
     ).setOrigin(0, 0).setDepth(BACKGROUND_DEPTH);
 
-    this.add.rectangle(0, 0, this.scale.width, 40, 0x000000, 0.6).setOrigin(0);
+    this.add.rectangle(0, 0, this.scale.width, HEADER.height, 0x000000, 0.6).setOrigin(0);
+    this.add.rectangle(0, HEADER.height, this.scale.width, HEADER.ruleHeight, 0x000000, 1).setOrigin(0);
 
-    this.scoreText = this.add.text(10, 10, 'Score: 0', {
+    this.scoreText = this.add.text(HEADER.paddingX, 10, 'Score: 0', {
       fontSize: '20px',
       color: '#ffffff',
     }).setScrollFactor(0);
 
-    this.pingText = this.add.text(200, 10, 'Ping: --ms', {
+    this.pingText = this.add.text(200, 10, formatPingReadout(undefined), {
       fontSize: '20px',
-      color: '#ffffff',
+      color: '#cccccc',
     }).setScrollFactor(0);
+    this.pingBars = this.add.graphics().setScrollFactor(0);
+    this.setPing(undefined);
 
     this.fpsText = undefined;
     this.fpsMeter = createFpsMeter();
@@ -210,11 +212,6 @@ export class GameScene extends Phaser.Scene {
     // Guests play under the name they picked last time; logged-in players keep their account username.
     this.name = sessionName(userData, nameStore);
     this.playerId = String(userData.userId);
-
-    this.playerNameText = this.add.text(400, 10, `Player: ${this.name}`, {
-      fontSize: '20px',
-      color: '#ffffff',
-    }).setScrollFactor(0);
 
     // Guests get Login (opens the auth overlay on the login form); accounts get Logout.
     this.headerButton = new PixelButton(this, {
@@ -689,9 +686,28 @@ export class GameScene extends Phaser.Scene {
     this.scoreboardTexts.clear();
   }
 
+  // Update the header ping readout and signal meter; undefined means no ping yet.
+  setPing(pingMs: number | undefined) {
+    this.pingText.setText(formatPingReadout(pingMs));
+    const g = this.pingBars;
+    if (!g) return;
+    const lit = litBars(pingMs);
+    const left = this.pingText.x + this.pingText.width + 8;
+    const bottom = HEADER.height - 10;
+    g.clear();
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const h = HEADER.barHeightStep * (i + 1);
+      const x = left + i * (HEADER.barWidth + HEADER.barGap);
+      g.fillStyle(i < lit ? HEADER.litColour : HEADER.unlitColour, 1);
+      g.fillRect(x, bottom - h, HEADER.barWidth, h);
+      g.lineStyle(1, 0x000000, 1);
+      g.strokeRect(x, bottom - h, HEADER.barWidth, h);
+    }
+  }
+
   onConnectionLost() {
     this.reconnectText?.destroy();
-    this.reconnectText = this.add.text(10, 40, 'Reconnecting...', {
+    this.reconnectText = this.add.text(HEADER.paddingX, HEADER_BOTTOM + 4, 'Reconnecting...', {
       fontSize: '20px',
       color: '#ff0000',
     }).setScrollFactor(0);
@@ -704,7 +720,7 @@ export class GameScene extends Phaser.Scene {
 
   onReconnectFailed() {
     this.reconnectText?.destroy();
-    this.reconnectText = this.add.text(10, 40, 'Connection lost. Please refresh the page.', {
+    this.reconnectText = this.add.text(HEADER.paddingX, HEADER_BOTTOM + 4, 'Connection lost. Please refresh the page.', {
       fontSize: '20px',
       color: '#ff0000',
     }).setScrollFactor(0);
@@ -729,7 +745,7 @@ export class GameScene extends Phaser.Scene {
     }
     const report = this.fpsMeter.frame(deltaMs);
     if (!this.fpsText) {
-      this.fpsText = this.add.text(this.scoreText.x, this.scoreText.y + this.scoreText.height + 4, 'FPS: --', {
+      this.fpsText = this.add.text(HEADER.paddingX, HEADER_BOTTOM + 34, 'FPS: --', {
         fontSize: '20px',
         color: '#ffffff',
       }).setScrollFactor(0).setDepth(10);
@@ -783,7 +799,8 @@ export class GameScene extends Phaser.Scene {
     this.scoreText?.destroy();
     this.pingText?.destroy();
     this.destroyFpsText();
-    this.playerNameText?.destroy();
+    this.pingBars?.destroy();
+    this.pingBars = undefined;
     this.headerButton?.destroy();
     this.headerButton = undefined;
     this.scoreboardBg?.destroy();
