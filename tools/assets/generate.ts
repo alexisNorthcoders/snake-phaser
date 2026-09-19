@@ -22,7 +22,10 @@ async function listCandidates(dir: string): Promise<Candidate[]> {
     const found: Candidate[] = []
     for (const file of await readdir(`${dir}/food`)) {
         const m = /^(.+)-(\d+)\.png$/.exec(file)
-        if (m && isFoodType(m[1])) found.push({ slot: m[1], index: Number(m[2]) })
+        if (!m || !isFoodType(m[1])) continue
+        const index = Number(m[2])
+        // Only the fixed 1..N indices count; leftovers from older runs must not appear in the sheet.
+        if (index >= 1 && index <= CANDIDATES_PER_SLOT) found.push({ slot: m[1], index })
     }
     return found
 }
@@ -32,7 +35,10 @@ async function main() {
         options: { theme: { type: 'string' }, only: { type: 'string', multiple: true } },
         allowPositionals: true,
     })
-    if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--only <foodType>...]')
+    if (!values.theme) throw new Error('Usage: npm run assets:generate -- --theme <name> [--only <foodType>[,<foodType>...]]... (repeat --only or comma-separate)')
+    if (positionals.length > 0) {
+        throw new Error(`Unexpected argument(s): ${positionals.join(' ')}. Use --only a --only b or --only a,b`)
+    }
 
     try {
         process.loadEnvFile('.env.local')
@@ -41,8 +47,8 @@ async function main() {
     }
 
     const theme = await loadTheme(values.theme)
-    // npm-style `--only a b` leaves `b` as a positional.
-    const slots = resolveSlots([...(values.only ?? []), ...(values.only ? positionals : [])])
+    // Repeated flags are collected by parseArgs; resolveSlots also splits comma lists.
+    const slots = resolveSlots(values.only ?? [])
 
     const dir = `${OUTPUT_ROOT}/${theme.name}`
     await mkdir(`${dir}/raw`, { recursive: true })

@@ -12,7 +12,7 @@ export interface Candidate {
     index: number
 }
 
-/** Resolves `--only` values (repeated flags, comma lists or trailing positionals) to slots; no values means every slot. */
+/** Resolves `--only` values (repeated flags or comma lists) to slots; no values means every slot. */
 export function resolveSlots(only: readonly string[]): readonly FoodType[] {
     const names = only.flatMap((v) => v.split(',')).map((v) => v.trim()).filter(Boolean)
     if (names.length === 0) return FOOD_TYPES
