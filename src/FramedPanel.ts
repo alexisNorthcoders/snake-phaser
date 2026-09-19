@@ -21,6 +21,16 @@ export class FramedPanel {
     this.draw(computeDividerRects(width), x, y);
   }
 
+  setDepth(depth: number): this {
+    this.objects.forEach((obj) => obj.setDepth(depth));
+    return this;
+  }
+
+  setVisible(visible: boolean): this {
+    this.objects.forEach((obj) => obj.setVisible(visible));
+    return this;
+  }
+
   destroy(): void {
     this.objects.forEach((obj) => obj.destroy());
     this.objects.length = 0;
