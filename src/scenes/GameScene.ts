@@ -347,12 +347,13 @@ export class GameScene extends Phaser.Scene {
 
   /** Open the auth overlay on Create Account from the Game Over panel; Back leaves the panel as it was. */
   private openSaveScore() {
+    this.setGameOverPanelVisible(false);
     authModalManager.open(this, {
       initialForm: 'register',
       title: 'SAVE YOUR SCORE',
       subtitle: 'Create an account to keep your scores',
       onAuthSuccess: () => this.restartAsAccount(),
-      onDismiss: () => {},
+      onDismiss: () => this.setGameOverPanelVisible(true),
     });
   }
 
@@ -662,6 +663,11 @@ export class GameScene extends Phaser.Scene {
 
       this.gameOverObjects.push(saveScoreButton);
     }
+  }
+
+  /** Hidden objects receive no pointer input, so the panel is inert while hidden. */
+  private setGameOverPanelVisible(visible: boolean) {
+    this.gameOverObjects.forEach((obj) => (obj as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Visible).setVisible(visible));
   }
 
   private clearGameOverOverlay() {
