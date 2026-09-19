@@ -19,6 +19,8 @@ import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
 import { PixelButton } from '../PixelButton';
 import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
+import { FramedPanel } from '../FramedPanel';
+import { LOBBY_PANEL, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
   head: string;
@@ -56,7 +58,6 @@ export class GameScene extends Phaser.Scene {
   public gameStarted: boolean = false;
   public playerId: string = '';
   public gameConfigured: boolean = false
-  public welcomeText?: Phaser.GameObjects.Text;
   public snakes: Map<string, Snake> = new Map();
   public food: Array<Food> = [];
   public bg!: Phaser.GameObjects.TileSprite;
@@ -68,13 +69,16 @@ export class GameScene extends Phaser.Scene {
   };
   public name: string = '';
   private guest: boolean = false;
-  private startButton?: Phaser.GameObjects.Text;
+  private lobbyPanel?: FramedPanel;
+  private lobbyTitle?: Phaser.GameObjects.Text;
+  private startButton?: PixelButton;
   private colourPanel?: ColourPanel;
   private lobbyAmbience?: LobbyAmbience;
   private colourSelection?: ColourSelection;
   private accountAppearance?: AccountAppearanceStore;
   private nameField?: InputText;
   private nameLabel?: Phaser.GameObjects.Text;
+  private nameFieldFrame?: Phaser.GameObjects.Graphics;
   private gameOverObjects: Phaser.GameObjects.GameObject[] = [];
   private reconnectText: Phaser.GameObjects.Text | null = null;
   private leaderboardObjects: Phaser.GameObjects.GameObject[] = [];
@@ -100,27 +104,79 @@ export class GameScene extends Phaser.Scene {
     (this.accountAppearance ?? appearanceStore).save(this.snakeColors);
   }
 
-  private createNameField(): void {
-    this.nameLabel = this.add.text(300, 460, 'Name:', { fontSize: '20px', color: '#ffffff' }).setOrigin(1, 0.5);
-    this.nameField = new InputText(this, 410, 460, 160, 34, {
+  private createNameField(rowY: number): void {
+    const left = LOBBY_PANEL.x + LOBBY_PANEL.padding;
+    const right = LOBBY_PANEL.x + LOBBY_PANEL.width - LOBBY_PANEL.padding;
+    this.nameLabel = this.add.text(left, rowY + NAME_ROW_HEIGHT / 2, 'Name', {
+      fontFamily: FONT_FAMILY, fontSize: '24px', color: '#ffffff',
+    }).setOrigin(0, 0.5);
+    const inputX = left + this.nameLabel.width + 16;
+    // 4px black outline, #333333 fill and a dark 4px inner top-left edge; the DOM input sits inside them.
+    this.nameFieldFrame = this.add.graphics();
+    this.nameFieldFrame.fillStyle(0x000000, 1).fillRect(inputX, rowY, right - inputX, NAME_ROW_HEIGHT);
+    this.nameFieldFrame.fillStyle(0x333333, 1).fillRect(inputX + 4, rowY + 4, right - inputX - 8, NAME_ROW_HEIGHT - 8);
+    this.nameFieldFrame.fillStyle(0x000000, 0.45)
+      .fillRect(inputX + 4, rowY + 4, right - inputX - 8, 4)
+      .fillRect(inputX + 4, rowY + 4, 4, NAME_ROW_HEIGHT - 8);
+    const fieldX = inputX + 8;
+    const fieldY = rowY + 8;
+    const fieldW = right - 4 - fieldX;
+    const fieldH = NAME_ROW_HEIGHT - 12;
+    this.nameField = new InputText(this, fieldX + fieldW / 2, fieldY + fieldH / 2, fieldW, fieldH, {
       backgroundColor: '#333',
       fontFamily: FONT_FAMILY,
       fontSize: '20px',
       color: '#fff',
       type: 'text',
       maxLength: MAX_NAME_LENGTH,
-      placeholder: 'anonymous',
+      placeholder: 'Guest',
       text: nameStore.saved(),
     });
     this.add.existing(this.nameField);
     this.nameField.on('textchange', () => this.applyNameField());
   }
 
+  /** The framed lobby panel: title, divider and Start button; the Name row is added for guests. */
+  private createLobbyPanel(): void {
+    const p = LOBBY_PANEL;
+    const layout = computeLobbyPanelLayout(this.guest);
+    this.lobbyPanel = new FramedPanel(this, p.x, p.y, p.width, p.height, p.scrimAlpha);
+    this.lobbyPanel.addDivider(layout.contentX, layout.dividerY, layout.contentWidth);
+    this.lobbyTitle = this.add.text(p.x + p.width / 2, layout.titleY + TITLE_HEIGHT / 2, 'Snake Game', {
+      fontFamily: FONT_FAMILY, fontSize: '32px', color: '#ffffff',
+    }).setOrigin(0.5).setShadow(4, 4, '#008000', 0, false, true);
+    if (layout.nameRowY !== undefined) this.createNameField(layout.nameRowY);
+    this.startButton = new PixelButton(this, {
+      x: p.x + (p.width - START_BUTTON.width) / 2,
+      y: layout.startY,
+      width: START_BUTTON.width,
+      height: START_BUTTON.height,
+      label: 'Start',
+      size: 'large',
+      fill: 'action',
+      fontSize: 28,
+      onClick: () => {
+        console.log("[GameScene] Start button clicked");
+        this.commitName();
+        socketManager.send({ event: 'startGame' });
+      },
+    });
+  }
+
+  private destroyLobbyPanel(): void {
+    this.lobbyPanel?.destroy();
+    this.lobbyPanel = undefined;
+    this.lobbyTitle?.destroy();
+    this.lobbyTitle = undefined;
+    this.startButton?.destroy();
+    this.startButton = undefined;
+    this.destroyNameField();
+  }
+
   // Sync this.name and the visible name texts from the field's current value.
   private applyNameField(): void {
     if (!this.nameField) return;
     this.name = normaliseName(this.nameField.text);
-    this.welcomeText?.setText(`Welcome ${this.name}!`);
   }
 
   // Persist and send the chosen guest name; called once when the game starts.
@@ -135,6 +191,8 @@ export class GameScene extends Phaser.Scene {
     this.nameField = undefined;
     this.nameLabel?.destroy();
     this.nameLabel = undefined;
+    this.nameFieldFrame?.destroy();
+    this.nameFieldFrame = undefined;
   }
 
   private createColourPanel(): void {
@@ -286,28 +344,11 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    this.startButton = this.add.text(400, 400, 'START GAME', {
-      fontSize: '28px',
-      backgroundColor: '#00AA00',
-      color: '#FFFFFF',
-      padding: { x: 10, y: 5 },
-    }).setOrigin(0.5).setInteractive();
-
-    this.startButton.on('pointerdown', () => {
-      console.log("[GameScene] Start button clicked");
-      this.commitName();
-      socketManager.send({ event: 'startGame' });
-    });
-
-    this.welcomeText = this.add.text(400, 110, `Welcome ${this.name}!`, {
-      fontSize: '32px',
-      color: '#fff',
-    }).setOrigin(0.5);
+    this.createLobbyPanel();
 
     if (this.guest) {
       this.snakeColors = appearanceStore.load();
       this.createColourPanel();
-      this.createNameField();
     } else {
       // The panel is only built once the account's colours (or the random fallback) have arrived, so nothing
       // flashes or can be picked before the load, and the selection starts from the loaded colours.
@@ -320,7 +361,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.sys.isActive()) return;
         // Colours are applied even if the lobby was already left, so the game still uses them.
         Object.assign(this.snakeColors, colours);
-        if (this.welcomeText?.active && !this.colourPanel) this.createColourPanel();
+        if (this.lobbyPanel && !this.colourPanel) this.createColourPanel();
         this.sendColorUpdate();
       });
     }
@@ -505,18 +546,8 @@ export class GameScene extends Phaser.Scene {
     console.log("[GameScene] Game started callback");
     this.gameStarted = true;
 
-    // Remove start button
-    if (this.startButton) {
-      this.startButton.destroy();
-      this.startButton = undefined;
-    }
-
-    // Remove welcome text if it exists
-    if (this.welcomeText) {
-      this.welcomeText.destroy();
-    }
-
-    this.destroyNameField();
+    // Remove the lobby panel (title, divider, Name row, Start button)
+    this.destroyLobbyPanel();
 
     this.destroyLobbyAmbience();
 
@@ -805,8 +836,7 @@ export class GameScene extends Phaser.Scene {
     this.headerButton = undefined;
     this.scoreboardBg?.destroy();
     this.scoreboardHeader?.destroy();
-    this.welcomeText?.destroy();
-    this.destroyNameField();
+    this.destroyLobbyPanel();
     this.destroyColourPanel();
     this.destroyLobbyAmbience();
     this.reconnectText?.destroy();
