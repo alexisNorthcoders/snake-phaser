@@ -10,6 +10,7 @@ import { ColourPanel } from '../ColourPanel';
 import { LobbyAmbience, BACKGROUND_DEPTH, BACKGROUND_DIM_DEPTH } from '../LobbyAmbience';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
 import { isGuest, sessionName } from '../userData';
+import { createGuestSession, restoreSession, type SessionDeps } from '../session';
 import { feature, localStorageOrNothing } from '../feature';
 import { BAR_COUNT, HEADER, HEADER_BOTTOM, formatPingReadout, litBars } from '../pingSignal';
 import { createFpsMeter, formatFpsReadout } from '../fpsMeter';
@@ -77,6 +78,9 @@ export class GameScene extends Phaser.Scene {
   private startButton?: PixelButton;
   private colourPanel?: ColourPanel;
   private lobbyAmbience?: LobbyAmbience;
+  private sessionRetry?: Phaser.Time.TimerEvent;
+  private sessionAttempt = 0;
+  private sessionErrorObjects: { destroy(): void }[] = [];
   private colourSelection?: ColourSelection;
   private accountAppearance?: AccountAppearanceStore;
   private nameField?: InputText;
@@ -278,29 +282,6 @@ export class GameScene extends Phaser.Scene {
       this.resetCountdown();
     });
 
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-
-    this.guest = isGuest(userData);
-    // Guests play under the name they picked last time; logged-in players keep their account username.
-    this.name = sessionName(userData, nameStore);
-    this.playerId = String(userData.userId);
-
-    // Guests get Login (opens the auth overlay on the login form); accounts get Logout.
-    this.headerButton = new PixelButton(this, {
-      ...headerButtonPosition(this.scale.width),
-      width: HEADER_BUTTON.width,
-      height: HEADER_BUTTON.height,
-      label: this.guest ? 'Login' : 'Logout',
-      labelColor: this.guest ? '#ffffff' : '#ff4444',
-      onClick: () => {
-        if (this.guest) {
-          this.openLogIn();
-        } else {
-          this.logout();
-        }
-      },
-    });
-
     this.scoreboard?.destroy();
     this.scoreboard = new ScoreboardPanel(this);
 
@@ -345,6 +326,97 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
+    // First frame is the background and ambient snakes; everything that needs the player waits for the session.
+    if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this, () => this.snakeColors);
+
+    // Generate or retrieve client ID on first app load
+    ClientIdManager.getOrCreateClientId();
+
+    this.bootSession();
+  }
+
+  private sessionDeps(): SessionDeps {
+    return { fetch: window.fetch.bind(window), storage: localStorageOrNothing() };
+  }
+
+  private bootSession(): void {
+    this.hideSessionError();
+    this.destroyLobbyUi();
+    // Only the latest attempt may build; an older in-flight one (retry button vs timer) is dropped.
+    const attempt = ++this.sessionAttempt;
+    const deps = this.sessionDeps();
+    restoreSession(deps)
+      .then((user) => user ?? createGuestSession(deps))
+      .then((user) => {
+        if (!this.sys.isActive() || attempt !== this.sessionAttempt) return;
+        if (user) this.buildLobby();
+        else this.showSessionError();
+      });
+  }
+
+  private showSessionError(): void {
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const message = this.add.text(w / 2, h / 2 - 20, "Can't reach the server \u2014 retrying", {
+      fontSize: '22px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 12, y: 8 },
+    }).setOrigin(0.5).setDepth(BACKGROUND_DIM_DEPTH + 1);
+    const retry = new PixelButton(this, {
+      x: w / 2 - HEADER_BUTTON.width / 2,
+      y: h / 2 + 20,
+      width: HEADER_BUTTON.width,
+      height: HEADER_BUTTON.height,
+      label: 'Retry',
+      labelColor: '#ffffff',
+      onClick: () => this.bootSession(),
+    });
+    this.sessionErrorObjects = [message, retry];
+    this.sessionRetry = this.time.delayedCall(3000, () => this.bootSession());
+  }
+
+  private hideSessionError(): void {
+    this.sessionRetry?.remove(false);
+    this.sessionRetry = undefined;
+    this.sessionErrorObjects.forEach((o) => o.destroy());
+    this.sessionErrorObjects = [];
+  }
+
+  /** Tears down everything buildLobby creates, so a rebuild never stacks on a previous partial state. */
+  private destroyLobbyUi(): void {
+    this.headerButton?.destroy();
+    this.headerButton = undefined;
+    this.destroyLobbyPanel();
+    this.destroyColourPanel();
+    this.destroyLeaderboardPanel();
+  }
+
+  private buildLobby(): void {
+    this.destroyLobbyUi();
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+
+    this.guest = isGuest(userData);
+    // Guests play under the name they picked last time; logged-in players keep their account username.
+    this.name = sessionName(userData, nameStore);
+    this.playerId = String(userData.userId);
+
+    // Guests get Login (opens the auth overlay on the login form); accounts get Logout.
+    this.headerButton = new PixelButton(this, {
+      ...headerButtonPosition(this.scale.width),
+      width: HEADER_BUTTON.width,
+      height: HEADER_BUTTON.height,
+      label: this.guest ? 'Login' : 'Logout',
+      labelColor: this.guest ? '#ffffff' : '#ff4444',
+      onClick: () => {
+        if (this.guest) {
+          this.openLogIn();
+        } else {
+          this.logout();
+        }
+      },
+    });
+
     this.createLobbyPanel();
 
     if (this.guest) {
@@ -367,8 +439,6 @@ export class GameScene extends Phaser.Scene {
       });
     }
     this.createLeaderboardPanel();
-
-    if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this, () => this.snakeColors);
 
     // connect to websockets
     socketManager.connect(String(userData.userId), userData.token, this);
@@ -421,7 +491,6 @@ export class GameScene extends Phaser.Scene {
 
     if (userData.token) {
       try {
-
         const response = await fetch(`/api/logout`, {
           method: 'POST',
           headers: {
@@ -430,24 +499,19 @@ export class GameScene extends Phaser.Scene {
           },
         });
 
-        if (response.ok) {
-
-          localStorage.removeItem('userData');
-          this.scene.start('LoginScene');
-        } else {
-
+        if (!response.ok) {
           console.error('Failed to log out:', response.statusText);
+          return;
         }
       } catch (error) {
         console.error('Error during logout:', error);
-
+        return;
       }
-    } else {
-
-      localStorage.removeItem('userData');
-      this.scene.stop('GameScene');
-      this.scene.start('LoginScene');
     }
+
+    // Clears the session; the restarted scene comes up as a fresh guest.
+    localStorage.removeItem('userData');
+    this.scene.start('GameScene');
   }
 
   private createLeaderboardPanel(): void {
