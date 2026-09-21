@@ -79,6 +79,7 @@ export class GameScene extends Phaser.Scene {
   private colourPanel?: ColourPanel;
   private lobbyAmbience?: LobbyAmbience;
   private sessionRetry?: Phaser.Time.TimerEvent;
+  private sessionAttempt = 0;
   private sessionErrorObjects: { destroy(): void }[] = [];
   private colourSelection?: ColourSelection;
   private accountAppearance?: AccountAppearanceStore;
@@ -340,11 +341,14 @@ export class GameScene extends Phaser.Scene {
 
   private bootSession(): void {
     this.hideSessionError();
+    this.destroyLobbyUi();
+    // Only the latest attempt may build; an older in-flight one (retry button vs timer) is dropped.
+    const attempt = ++this.sessionAttempt;
     const deps = this.sessionDeps();
     restoreSession(deps)
       .then((user) => user ?? createGuestSession(deps))
       .then((user) => {
-        if (!this.sys.isActive()) return;
+        if (!this.sys.isActive() || attempt !== this.sessionAttempt) return;
         if (user) this.buildLobby();
         else this.showSessionError();
       });
@@ -379,7 +383,17 @@ export class GameScene extends Phaser.Scene {
     this.sessionErrorObjects = [];
   }
 
+  /** Tears down everything buildLobby creates, so a rebuild never stacks on a previous partial state. */
+  private destroyLobbyUi(): void {
+    this.headerButton?.destroy();
+    this.headerButton = undefined;
+    this.destroyLobbyPanel();
+    this.destroyColourPanel();
+    this.destroyLeaderboardPanel();
+  }
+
   private buildLobby(): void {
+    this.destroyLobbyUi();
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
     this.guest = isGuest(userData);
@@ -497,7 +511,7 @@ export class GameScene extends Phaser.Scene {
 
     // Clears the session; the restarted scene comes up as a fresh guest.
     localStorage.removeItem('userData');
-    this.scene.restart();
+    this.scene.start('GameScene');
   }
 
   private createLeaderboardPanel(): void {
