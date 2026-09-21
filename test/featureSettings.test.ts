@@ -184,3 +184,17 @@ test('list() shows assetTheme with its allowed values', () => {
   createFeatureSettings(new MemoryStorage(), out).list();
   assert.match(out.lines.join('\n'), /feature\.assetTheme = 'goblin-treasure'.*'classic' \| 'goblin-treasure'/);
 });
+
+test('vsBot is off by default, survives a reload, and a non-boolean warns and resets to off', () => {
+  const storage = new MemoryStorage();
+  const out = quietLog();
+  const feature = createFeatureSettings(storage, out);
+  assert.equal(feature.vsBot, false);
+
+  feature.vsBot = true;
+  assert.equal(createFeatureSettings(storage, quietLog()).vsBot, true);
+
+  feature.vsBot = 'yes' as never;
+  assert.equal(feature.vsBot, false);
+  assert.match(out.lines.join('\n'), /vsBot/);
+});

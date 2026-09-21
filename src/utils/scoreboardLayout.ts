@@ -16,6 +16,8 @@ export interface ScoreboardPlayer {
   score: number;
   isDead: boolean;
   headColour: string;
+  /** The server's synced `isBot` flag; never inferred from the name or id. */
+  isBot?: boolean;
 }
 
 export interface ScoreboardRow {
@@ -24,10 +26,20 @@ export interface ScoreboardRow {
   score: number;
   isDead: boolean;
   headColour: number;
+  isBot: boolean;
 }
 
 const MAX_NAME_CHARS = 12;
 const truncate = (name: string) => (name.length > MAX_NAME_CHARS ? name.slice(0, MAX_NAME_CHARS - 1) + '…' : name);
+
+const BOT_TAG = ' [BOT]';
+
+/** A bot's name is cut shorter so its tag still fits the row. */
+export function displayName(name: string, isBot: boolean): string {
+  if (!isBot) return truncate(name);
+  const room = MAX_NAME_CHARS - BOT_TAG.length;
+  return (name.length > room ? name.slice(0, room - 1) + '…' : name) + BOT_TAG;
+}
 
 /** Highest score first, capped at the visible maximum; the local player is labelled "You". */
 export function scoreboardRows(players: ScoreboardPlayer[], selfId: string | undefined): ScoreboardRow[] {
@@ -36,10 +48,11 @@ export function scoreboardRows(players: ScoreboardPlayer[], selfId: string | und
     .slice(0, SCOREBOARD_MAX_ROWS)
     .map((p) => ({
       id: p.id,
-      label: p.id === selfId ? 'You' : truncate(p.name || 'Player'),
+      label: p.id === selfId ? 'You' : displayName(p.name || 'Player', !!p.isBot),
       score: p.score,
       isDead: p.isDead,
       headColour: parseColour(p.headColour),
+      isBot: !!p.isBot,
     }));
 }
 

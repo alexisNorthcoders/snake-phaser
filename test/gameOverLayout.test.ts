@@ -33,3 +33,9 @@ test('Save Score sits 20px under Play Again for guests only', () => {
   assert.equal(member.saveScoreY, undefined);
   assert.ok(guest.panelHeight > member.panelHeight);
 });
+
+test('rankingName tags only bots', async () => {
+  const { rankingName } = await import('../src/utils/gameOverLayout.ts');
+  assert.equal(rankingName('Bot', true), 'Bot [BOT]');
+  assert.equal(rankingName('Bot', false), 'Bot');
+});
