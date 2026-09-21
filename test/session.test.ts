@@ -75,6 +75,12 @@ test('storage that throws does not crash either function', async () => {
   assert.equal(user?.isGuest, true);
 });
 
-test('missing storage is tolerated', async () => {
-  assert.equal(await restoreSession({ fetch: validToken as typeof fetch, storage: undefined }), undefined);
+test('missing storage is tolerated: nothing to restore, so the server is never asked', async () => {
+  const fetch = async () => { throw new Error('should not be called'); };
+  assert.equal(await restoreSession({ fetch: fetch as typeof globalThis.fetch, storage: undefined }), undefined);
+});
+
+test('missing storage still lets a guest session be created (it just is not persisted)', async () => {
+  const user = await createGuestSession({ fetch: json({ accessToken: 'g', userId: 3 }) as typeof fetch, storage: undefined });
+  assert.deepEqual(user, { token: 'g', username: 'anonymous', userId: 3, isGuest: true });
 });
