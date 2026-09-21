@@ -223,11 +223,12 @@ export class GameScene extends Phaser.Scene {
     this.startError?.destroy();
     this.startError = undefined;
     if (startGame) this.startButton?.setLabel('Starting...');
+    let connected = false;
     try {
       const user = await createGuestSession(this.sessionDeps());
       if (!this.sys.isActive()) return;
       if (!user) {
-        this.failStart();
+        this.failStart(true);
         return;
       }
       // The name is committed before connecting so the room is joined under the name chosen in the lobby.
@@ -235,6 +236,7 @@ export class GameScene extends Phaser.Scene {
       this.playerId = String(user.userId);
       this.sessionConnected = true;
       await socketManager.connect(this.playerId, String(user.token), this);
+      connected = true;
       if (!this.sys.isActive()) return;
       socketManager.startPingMeasurement(this);
       if (startGame) socketManager.send({ event: 'startGame' });
@@ -242,16 +244,16 @@ export class GameScene extends Phaser.Scene {
       console.error('[GameScene] Start failed', err);
       if (this.sys.isActive()) {
         this.sessionConnected = false;
-        this.failStart();
+        this.failStart(!connected);
       }
     } finally {
       this.startInFlight = false;
     }
   }
 
-  private failStart(): void {
+  private failStart(roomMissing: boolean): void {
     this.startButton?.setLabel('Start');
-    if (this.vsBot) {
+    if (this.vsBot && roomMissing) {
       // The bot room was never created: fall back to the entry point so the player can try again.
       this.vsBot = false;
       this.createVsBotButton();
@@ -895,7 +897,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data?: { vsBot?: boolean }) {
-    this.vsBot = feature.vsBot && data?.vsBot === true;
+    // The scene instance survives restarts, so a restart without data keeps the current mode instead of dropping to the public lobby.
+    if (data?.vsBot !== undefined) this.vsBot = feature.vsBot && data.vsBot;
+    else this.vsBot = feature.vsBot && this.vsBot;
     // Initialize properties here
     this.snakes = new Map();
     this.food = [];
