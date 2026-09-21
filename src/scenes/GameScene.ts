@@ -255,6 +255,12 @@ export class GameScene extends Phaser.Scene {
     socketManager.send({ event: 'updatePlayer', name: this.name });
   }
 
+  private setNameRowVisible(visible: boolean): void {
+    this.nameField?.setVisible(visible);
+    this.nameLabel?.setVisible(visible);
+    this.nameFieldFrame?.setVisible(visible);
+  }
+
   private destroyNameField(): void {
     this.nameField?.destroy();
     this.nameField = undefined;
@@ -481,10 +487,12 @@ export class GameScene extends Phaser.Scene {
 
   /** Open the auth overlay on the login form; on success restart so the room is rejoined as the account. */
   private openLogIn() {
+    // The Name row's DOM input paints above the canvas whatever the Phaser depth, so hide it under the modal.
+    this.setNameRowVisible(false);
     const authConfig: AuthModalConfig = {
       initialForm: 'login',
       onAuthSuccess: () => this.restartAsAccount(),
-      onDismiss: () => {},
+      onDismiss: () => this.setNameRowVisible(true),
     };
     authModalManager.open(this, authConfig);
   }
