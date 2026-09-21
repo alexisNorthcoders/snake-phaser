@@ -188,23 +188,35 @@ export class GameScene extends Phaser.Scene {
     this.startError?.destroy();
     this.startError = undefined;
     this.startButton?.setLabel('Starting...');
-    const user = await createGuestSession(this.sessionDeps());
-    if (!this.sys.isActive()) return;
-    if (!user) {
+    try {
+      const user = await createGuestSession(this.sessionDeps());
+      if (!this.sys.isActive()) return;
+      if (!user) {
+        this.failStart();
+        return;
+      }
+      // The name is committed before connecting so the room is joined under the name chosen in the lobby.
+      this.commitName();
+      this.playerId = String(user.userId);
+      this.sessionConnected = true;
+      await socketManager.connect(this.playerId, String(user.token), this);
+      if (!this.sys.isActive()) return;
+      socketManager.startPingMeasurement(this);
+      socketManager.send({ event: 'startGame' });
+    } catch (err) {
+      console.error('[GameScene] Start failed', err);
+      if (this.sys.isActive()) {
+        this.sessionConnected = false;
+        this.failStart();
+      }
+    } finally {
       this.startInFlight = false;
-      this.startButton?.setLabel('Start');
-      this.showStartError();
-      return;
     }
-    // The name is committed before connecting so the room is joined under the name chosen in the lobby.
-    this.commitName();
-    this.playerId = String(user.userId);
-    this.sessionConnected = true;
-    await socketManager.connect(this.playerId, String(user.token), this);
-    if (!this.sys.isActive()) return;
-    socketManager.startPingMeasurement(this);
-    socketManager.send({ event: 'startGame' });
-    this.startInFlight = false;
+  }
+
+  private failStart(): void {
+    this.startButton?.setLabel('Start');
+    this.showStartError();
   }
 
   private showStartError(): void {
