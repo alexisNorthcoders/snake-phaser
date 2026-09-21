@@ -1,8 +1,11 @@
 import InputText from "phaser3-rex-plugins/plugins/inputtext";
 import { ClientIdManager } from "../utils/clientIdManager";
 import { migrateAnonymousScores } from "../utils/scoreMigrationHelper";
-import { isGuest } from "../userData";
+import { createGuestSession, restoreSession, type SessionDeps } from "../session";
+import { localStorageOrNothing } from "../feature";
 import { FONT_FAMILY } from "../font";
+
+const sessionDeps = (): SessionDeps => ({ fetch: window.fetch.bind(window), storage: localStorageOrNothing() });
 
 export class LoginScene extends Phaser.Scene {
     private passwordText!: InputText
@@ -20,27 +23,14 @@ export class LoginScene extends Phaser.Scene {
         // Generate or retrieve client ID on first app load
         ClientIdManager.getOrCreateClientId();
 
-        const userData = localStorage.getItem('userData');
-
-        if (userData) {
-            const parsedUserData = JSON.parse(userData);
-            this.verifyToken(parsedUserData.token)
-                .then((isValid) => {
-                    if (isValid) {
-                        this.startGame();
-                    } else {
-                        this.showLoginScreen();
-                    }
-                })
-                .catch(() => {
-
-                    localStorage.removeItem('userData');
+        restoreSession(sessionDeps())
+            .then((user) => {
+                if (user) {
+                    this.startGame();
+                } else {
                     this.showLoginScreen();
-                });
-        } else {
-
-            this.showLoginScreen();
-        }
+                }
+            });
     }
 
     createLoginUI() {
@@ -185,64 +175,15 @@ export class LoginScene extends Phaser.Scene {
     }
 
     async anonymous() {
-        const res = await fetch(`${this.getAPIUrl()}/anonymous`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const user = await createGuestSession(sessionDeps());
 
-        if (res.ok) {
-            const data = await res.json();
-            localStorage.setItem('userData', JSON.stringify({
-                token: data.accessToken,
-                username: `anonymous`,
-                userId: data.userId,
-                isGuest: true,
-            }));
+        if (user) {
             this.startGame();
         } else {
             this.errorText.setText('Guest login failed.');
         }
     }
 
-    async verifyToken(token: string): Promise<boolean> {
-        try {
-            const response = await fetch(`${this.getAPIUrl()}/verify-token`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-
-                if (data.message === "Token is valid") {
-                    console.log(data)
-
-                    const userData = {
-                        token,
-                        username: data.user.username,
-                        userId: data.userId,
-                        expiresIn: data.expiresIn,
-                        // The server only knows the name, so carry the stored session's guest status over
-                        isGuest: isGuest(JSON.parse(localStorage.getItem('userData') || '{}')),
-                    };
-
-                    localStorage.setItem('userData', JSON.stringify(userData));
-
-                    return true;
-                } else {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        } catch (error) {
-            console.error('Error verifying token:', error);
-            return false;
-        }
-    }
     getAPIUrl() {
         return '/api';
     }
