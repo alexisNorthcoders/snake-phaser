@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { execSync } from 'child_process';
+import { THEME_BACKGROUND } from './src/theme';
 
 const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
 const buildNumber = execSync('git rev-list --count HEAD').toString().trim();
@@ -7,6 +8,12 @@ const version = `1.0.${buildNumber}`;
 const buildTime = new Date().toISOString();
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'theme-background',
+      transformIndexHtml: (html) => html.replaceAll('%THEME_BACKGROUND%', THEME_BACKGROUND),
+    },
+  ],
   define: {
     __BUILD_INFO__: JSON.stringify({ version, commitHash, buildTime }),
   },

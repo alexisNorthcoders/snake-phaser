@@ -2,6 +2,7 @@ import { Game, AUTO } from 'phaser';
 import { LoginScene } from './scenes/LoginScene';
 import { GameScene } from './scenes/GameScene';
 import { loadGameFont, withDefaultFont } from './font';
+import { THEME_BACKGROUND } from './theme';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext.js';
 
 // Phaser has no global text-style default (it hardcodes Courier), so default it at the factory.
@@ -14,7 +15,6 @@ function applyDefaultFont() {
 }
 
 export async function launchGame() {
-  await loadGameFont();
   applyDefaultFont();
 
   const MAX_WIDTH = 800;
@@ -35,7 +35,7 @@ console.log(isMobile)
     dom: {
       createContainer: true
     },
-    backgroundColor: '#1d1d1d',
+    backgroundColor: THEME_BACKGROUND,
     scene: [LoginScene, GameScene],
     plugins: {
       scene: [{
@@ -53,4 +53,7 @@ console.log(isMobile)
   };
 
   new Game(config);
+
+  // Text renders in the monospace fallback until Pixelify Sans arrives, then swaps.
+  await loadGameFont();
 }
