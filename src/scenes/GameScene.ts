@@ -1,4 +1,4 @@
-import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_ROW_HEIGHT } from '../utils/gameOverLayout';
+import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
@@ -59,6 +59,9 @@ export class GameScene extends Phaser.Scene {
   public scoreboardVisible: boolean = false;
   public isGameOver: boolean = false;
   public gameStarted: boolean = false;
+  /** True while playing a private match against the server bot; survives scene restarts so Play Again stays vs-bot. */
+  public vsBot: boolean = false;
+  private vsBotButton?: PixelButton;
   public playerId: string = '';
   public gameConfigured: boolean = false
   public snakes: Map<string, Snake> = new Map();
@@ -169,6 +172,23 @@ export class GameScene extends Phaser.Scene {
       fontSize: 28,
       onClick: () => this.onStartClicked(),
     });
+    if (!this.vsBot) this.createVsBotButton();
+  }
+
+  /** Dev-only entry point below the lobby panel, hidden unless `feature.vsBot` is on. */
+  private createVsBotButton(): void {
+    if (!feature.vsBot || this.vsBotButton) return;
+    const p = LOBBY_PANEL;
+    const width = 260;
+    this.vsBotButton = new PixelButton(this, {
+      x: p.x + (p.width - width) / 2,
+      y: p.y + p.height + 4,
+      width,
+      height: 34,
+      label: 'Play vs Computer',
+      fontSize: 18,
+      onClick: () => this.onVsBotClicked(),
+    });
   }
 
   private onStartClicked(): void {
@@ -179,15 +199,30 @@ export class GameScene extends Phaser.Scene {
       socketManager.send({ event: 'startGame' });
       return;
     }
-    void this.startAsNewGuest();
+    void this.startAsNewGuest(true);
+  }
+
+  /** "Play vs Computer": leave any public room and create a fresh vs-bot one, staying in the lobby to press Start. */
+  private onVsBotClicked(): void {
+    if (this.startInFlight || this.vsBot) return;
+    this.vsBot = true;
+    this.vsBotButton?.destroy();
+    this.vsBotButton = undefined;
+    if (this.sessionConnected) {
+      this.commitName();
+      socketManager.close();
+      this.scene.restart({ vsBot: true });
+      return;
+    }
+    void this.startAsNewGuest(false);
   }
 
   /** First Start for a visitor with no stored session: mint the guest token now, then connect and begin. */
-  private async startAsNewGuest(): Promise<void> {
+  private async startAsNewGuest(startGame: boolean): Promise<void> {
     this.startInFlight = true;
     this.startError?.destroy();
     this.startError = undefined;
-    this.startButton?.setLabel('Starting...');
+    if (startGame) this.startButton?.setLabel('Starting...');
     try {
       const user = await createGuestSession(this.sessionDeps());
       if (!this.sys.isActive()) return;
@@ -202,7 +237,7 @@ export class GameScene extends Phaser.Scene {
       await socketManager.connect(this.playerId, String(user.token), this);
       if (!this.sys.isActive()) return;
       socketManager.startPingMeasurement(this);
-      socketManager.send({ event: 'startGame' });
+      if (startGame) socketManager.send({ event: 'startGame' });
     } catch (err) {
       console.error('[GameScene] Start failed', err);
       if (this.sys.isActive()) {
@@ -216,6 +251,11 @@ export class GameScene extends Phaser.Scene {
 
   private failStart(): void {
     this.startButton?.setLabel('Start');
+    if (this.vsBot) {
+      // The bot room was never created: fall back to the entry point so the player can try again.
+      this.vsBot = false;
+      this.createVsBotButton();
+    }
     this.showStartError();
   }
 
@@ -237,6 +277,8 @@ export class GameScene extends Phaser.Scene {
     this.lobbyTitle = undefined;
     this.startButton?.destroy();
     this.startButton = undefined;
+    this.vsBotButton?.destroy();
+    this.vsBotButton = undefined;
     this.startError?.destroy();
     this.startError = undefined;
     this.destroyNameField();
@@ -693,7 +735,8 @@ export class GameScene extends Phaser.Scene {
 
     rankings.forEach((entry, i) => {
       const y = panelY + c.roomRowsY + i * GAME_OVER_ROW_HEIGHT + GAME_OVER_ROW_HEIGHT / 2;
-      addRow(i, entry.name, entry.score, y, entry.id === sessionId ? '#ffff00' : '#ffffff');
+      const isBot = !!socketManager.getRoom()?.state.players.find((p) => p.id === entry.id)?.isBot;
+      addRow(i, rankingName(entry.name, isBot), entry.score, y, entry.id === sessionId ? '#ffff00' : '#ffffff');
     });
 
     addText(centerX, panelY + c.subheadingY + 16, 'Top scores', 22, '#ff4444');
@@ -721,7 +764,7 @@ export class GameScene extends Phaser.Scene {
         // Rounds never restart in place: leave the room and rejoin a fresh lobby so no stale round state survives.
         this.destroyLobbyAmbience();
         socketManager.close();
-        this.scene.restart();
+        this.scene.restart({ vsBot: this.vsBot });
       },
     }).setDepth(DEPTH);
     this.gameOverObjects.push(playAgain);
@@ -784,7 +827,7 @@ export class GameScene extends Phaser.Scene {
   /** Connection dropped: restart into a fresh lobby (no leftover snakes, food or overlays); create() rejoins a new room. */
   onConnectionLost() {
     this.destroyLobbyAmbience();
-    this.scene.restart();
+    this.scene.restart({ vsBot: this.vsBot });
   }
 
   onReconnecting() {
@@ -851,7 +894,8 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  init() {
+  init(data?: { vsBot?: boolean }) {
+    this.vsBot = feature.vsBot && data?.vsBot === true;
     // Initialize properties here
     this.snakes = new Map();
     this.food = [];

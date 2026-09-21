@@ -15,6 +15,8 @@ export interface FeatureSettings {
     assetTheme: AssetTheme
     /** How far the background is dimmed behind the board, 0 (untouched) to 1 (black). */
     backgroundDim: number
+    /** Shows the "Play vs Computer" entry point in the lobby. Off until the vs-bot mode ships. */
+    vsBot: boolean
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -31,9 +33,9 @@ const MAX_WIDTH = 1
 const MIN_DIM = 0
 const MAX_DIM = 1
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'vsBot'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4 }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, vsBot: false }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -89,6 +91,12 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return clamped
     }
 
+    const vsBotFlag = (value: unknown): boolean => {
+        if (typeof value === 'boolean') return value
+        warn(`vsBot must be a boolean, got ${JSON.stringify(value)}; using ${DEFAULTS.vsBot}`)
+        return DEFAULTS.vsBot
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
@@ -98,6 +106,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         lobbyAmbience: 'lobbyAmbience' in stored ? ambienceFlag(stored.lobbyAmbience) : DEFAULTS.lobbyAmbience,
         assetTheme: 'assetTheme' in stored ? assetTheme(stored.assetTheme) : DEFAULTS.assetTheme,
         backgroundDim: 'backgroundDim' in stored ? backgroundDim(stored.backgroundDim) : DEFAULTS.backgroundDim,
+        vsBot: 'vsBot' in stored ? vsBotFlag(stored.vsBot) : DEFAULTS.vsBot,
     }
     const save = () => {
         try {
@@ -152,6 +161,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.backgroundDim = backgroundDim(dim)
             save()
         },
+        get vsBot() { return values.vsBot },
+        set vsBot(show) {
+            values.vsBot = vsBotFlag(show)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
@@ -162,6 +176,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.lobbyAmbience = ${values.lobbyAmbience}    // true | false, decorative snake around the lobby edge`,
                 `  feature.assetTheme = '${values.assetTheme}'    // ${ASSET_THEMES.map((theme) => `'${theme}'`).join(' | ')}, folder food textures load from (reload to apply)`,
                 `  feature.backgroundDim = ${values.backgroundDim}    // ${MIN_DIM}–${MAX_DIM}, dims the background behind the board (applies immediately)`,
+                `  feature.vsBot = ${values.vsBot}    // true | false, shows "Play vs Computer" in the lobby (reload to apply)`,
             ].join('\n'))
         },
     }

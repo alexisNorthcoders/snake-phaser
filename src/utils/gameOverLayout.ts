@@ -53,3 +53,8 @@ export function computeGameOverContentLayout(roomRows: number, topRows: number, 
     saveScoreY,
   };
 }
+
+/** Game Over ranking name; a bot's row is tagged using the room's synced `isBot` flag. */
+export function rankingName(name: string, isBot: boolean): string {
+  return isBot ? `${name} [BOT]` : name;
+}

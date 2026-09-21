@@ -52,6 +52,8 @@ export class Player extends Schema {
     @type("string") name: string = "";
     @type(SnakeColours) colours = new SnakeColours();
     @type(SnakeState) snake?: SnakeState;
+    /** Set by the server for its computer opponent; the only trustworthy way to tell a bot apart. */
+    @type("boolean") isBot: boolean = false;
 }
 
 export class GameState extends Schema {

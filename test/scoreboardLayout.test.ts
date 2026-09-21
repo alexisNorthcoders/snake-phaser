@@ -48,3 +48,17 @@ test('rgb() channels clamp and long names truncate', () => {
   assert.equal(parseColour('rgb(300, 0, 0)'), 0xff0000);
   assert.ok(scoreboardRows([player('a', 'x'.repeat(30), 1)], undefined)[0].label.length <= 12);
 });
+
+test('a bot row is tagged from the isBot flag, not from its name', () => {
+  const rows = scoreboardRows([
+    { ...player('x', 'Bot', 3), isBot: true },
+    player('y', 'Bot', 2),
+  ], undefined);
+  assert.deepEqual(rows.map((r) => r.label), ['Bot [BOT]', 'Bot']);
+  assert.deepEqual(rows.map((r) => r.isBot), [true, false]);
+});
+
+test('a long bot name is shortened so the tag still fits', () => {
+  const [row] = scoreboardRows([{ ...player('x', 'Terminator9000', 1), isBot: true }], undefined);
+  assert.equal(row.label, 'Termi… [BOT]');
+});
