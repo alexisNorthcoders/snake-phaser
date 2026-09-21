@@ -1,5 +1,4 @@
 import { Game, AUTO } from 'phaser';
-import { LoginScene } from './scenes/LoginScene';
 import { GameScene } from './scenes/GameScene';
 import { loadGameFont, withDefaultFont } from './font';
 import { THEME_BACKGROUND } from './theme';
@@ -36,7 +35,7 @@ console.log(isMobile)
       createContainer: true
     },
     backgroundColor: THEME_BACKGROUND,
-    scene: [LoginScene, GameScene],
+    scene: [GameScene],
     plugins: {
       scene: [{
         key: 'rexInputTextPlugin',
