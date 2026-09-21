@@ -9,7 +9,7 @@ import { ClientIdManager } from '../utils/clientIdManager';
 import { ColourPanel } from '../ColourPanel';
 import { LobbyAmbience, BACKGROUND_DEPTH, BACKGROUND_DIM_DEPTH } from '../LobbyAmbience';
 import { createColourSelection, type ColourSelection } from '../colourSelection';
-import { isGuest, sessionName } from '../userData';
+import { isGuest, sessionName, type StoredUser } from '../userData';
 import { createGuestSession, restoreSession, type SessionDeps } from '../session';
 import { feature, localStorageOrNothing } from '../feature';
 import { BAR_COUNT, HEADER, HEADER_BOTTOM, formatPingReadout, litBars } from '../pingSignal';
@@ -78,9 +78,11 @@ export class GameScene extends Phaser.Scene {
   private startButton?: PixelButton;
   private colourPanel?: ColourPanel;
   private lobbyAmbience?: LobbyAmbience;
-  private sessionRetry?: Phaser.Time.TimerEvent;
   private sessionAttempt = 0;
-  private sessionErrorObjects: { destroy(): void }[] = [];
+  /** True once the socket has been connected with a session; false while a first-time guest is still only browsing the lobby. */
+  private sessionConnected = false;
+  private startInFlight = false;
+  private startError?: Phaser.GameObjects.Text;
   private colourSelection?: ColourSelection;
   private accountAppearance?: AccountAppearanceStore;
   private nameField?: InputText;
@@ -165,12 +167,67 @@ export class GameScene extends Phaser.Scene {
       size: 'large',
       fill: 'action',
       fontSize: 28,
-      onClick: () => {
-        console.log("[GameScene] Start button clicked");
-        this.commitName();
-        socketManager.send({ event: 'startGame' });
-      },
+      onClick: () => this.onStartClicked(),
     });
+  }
+
+  private onStartClicked(): void {
+    console.log("[GameScene] Start button clicked");
+    if (this.startInFlight) return;
+    if (this.sessionConnected) {
+      this.commitName();
+      socketManager.send({ event: 'startGame' });
+      return;
+    }
+    void this.startAsNewGuest();
+  }
+
+  /** First Start for a visitor with no stored session: mint the guest token now, then connect and begin. */
+  private async startAsNewGuest(): Promise<void> {
+    this.startInFlight = true;
+    this.startError?.destroy();
+    this.startError = undefined;
+    this.startButton?.setLabel('Starting...');
+    try {
+      const user = await createGuestSession(this.sessionDeps());
+      if (!this.sys.isActive()) return;
+      if (!user) {
+        this.failStart();
+        return;
+      }
+      // The name is committed before connecting so the room is joined under the name chosen in the lobby.
+      this.commitName();
+      this.playerId = String(user.userId);
+      this.sessionConnected = true;
+      await socketManager.connect(this.playerId, String(user.token), this);
+      if (!this.sys.isActive()) return;
+      socketManager.startPingMeasurement(this);
+      socketManager.send({ event: 'startGame' });
+    } catch (err) {
+      console.error('[GameScene] Start failed', err);
+      if (this.sys.isActive()) {
+        this.sessionConnected = false;
+        this.failStart();
+      }
+    } finally {
+      this.startInFlight = false;
+    }
+  }
+
+  private failStart(): void {
+    this.startButton?.setLabel('Start');
+    this.showStartError();
+  }
+
+  private showStartError(): void {
+    const p = LOBBY_PANEL;
+    this.startError = this.add.text(p.x + p.width / 2, p.y + p.height + 16, "Can't reach the server \u2014 press Start to try again", {
+      fontFamily: FONT_FAMILY,
+      fontSize: '18px',
+      color: '#ff6666',
+      backgroundColor: '#000000',
+      padding: { x: 8, y: 4 },
+    }).setOrigin(0.5, 0).setDepth(BACKGROUND_DIM_DEPTH + 1);
   }
 
   private destroyLobbyPanel(): void {
@@ -180,6 +237,8 @@ export class GameScene extends Phaser.Scene {
     this.lobbyTitle = undefined;
     this.startButton?.destroy();
     this.startButton = undefined;
+    this.startError?.destroy();
+    this.startError = undefined;
     this.destroyNameField();
   }
 
@@ -340,47 +399,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private bootSession(): void {
-    this.hideSessionError();
     this.destroyLobbyUi();
     // Only the latest attempt may build; an older in-flight one (retry button vs timer) is dropped.
     const attempt = ++this.sessionAttempt;
     const deps = this.sessionDeps();
     restoreSession(deps)
-      .then((user) => user ?? createGuestSession(deps))
       .then((user) => {
         if (!this.sys.isActive() || attempt !== this.sessionAttempt) return;
-        if (user) this.buildLobby();
-        else this.showSessionError();
+        this.buildLobby(user);
       });
-  }
-
-  private showSessionError(): void {
-    const w = this.scale.width;
-    const h = this.scale.height;
-    const message = this.add.text(w / 2, h / 2 - 20, "Can't reach the server \u2014 retrying", {
-      fontSize: '22px',
-      color: '#ffffff',
-      backgroundColor: '#000000',
-      padding: { x: 12, y: 8 },
-    }).setOrigin(0.5).setDepth(BACKGROUND_DIM_DEPTH + 1);
-    const retry = new PixelButton(this, {
-      x: w / 2 - HEADER_BUTTON.width / 2,
-      y: h / 2 + 20,
-      width: HEADER_BUTTON.width,
-      height: HEADER_BUTTON.height,
-      label: 'Retry',
-      labelColor: '#ffffff',
-      onClick: () => this.bootSession(),
-    });
-    this.sessionErrorObjects = [message, retry];
-    this.sessionRetry = this.time.delayedCall(3000, () => this.bootSession());
-  }
-
-  private hideSessionError(): void {
-    this.sessionRetry?.remove(false);
-    this.sessionRetry = undefined;
-    this.sessionErrorObjects.forEach((o) => o.destroy());
-    this.sessionErrorObjects = [];
   }
 
   /** Tears down everything buildLobby creates, so a rebuild never stacks on a previous partial state. */
@@ -392,14 +419,17 @@ export class GameScene extends Phaser.Scene {
     this.destroyLeaderboardPanel();
   }
 
-  private buildLobby(): void {
+  /** Builds the lobby. Without a restored session the visitor is a guest browsing locally: no token, no connection until Start. */
+  private buildLobby(session?: StoredUser): void {
     this.destroyLobbyUi();
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const userData: StoredUser = session ?? {};
+    this.sessionConnected = session !== undefined;
+    this.startInFlight = false;
 
-    this.guest = isGuest(userData);
+    this.guest = session ? isGuest(userData) : true;
     // Guests play under the name they picked last time; logged-in players keep their account username.
-    this.name = sessionName(userData, nameStore);
-    this.playerId = String(userData.userId);
+    this.name = session ? sessionName(userData, nameStore) : nameStore.load();
+    this.playerId = session ? String(userData.userId) : '';
 
     // Guests get Login (opens the auth overlay on the login form); accounts get Logout.
     this.headerButton = new PixelButton(this, {
@@ -427,7 +457,7 @@ export class GameScene extends Phaser.Scene {
       // flashes or can be picked before the load, and the selection starts from the loaded colours.
       this.accountAppearance = createAccountAppearanceStore({
         fetch: (input, init) => fetch(input, init),
-        token: userData.token,
+        token: userData.token ?? '',
         anonymous: () => appearanceStore.peek(),
       });
       this.accountAppearance.load().then((colours) => {
@@ -440,8 +470,10 @@ export class GameScene extends Phaser.Scene {
     }
     this.createLeaderboardPanel();
 
+    if (!session) return;
+
     // connect to websockets
-    socketManager.connect(String(userData.userId), userData.token, this);
+    socketManager.connect(String(userData.userId), String(userData.token), this);
 
     // Start ping measurement after connection
     socketManager.startPingMeasurement(this);
