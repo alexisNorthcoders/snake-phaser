@@ -4,6 +4,7 @@ import { GameScene } from "./scenes/GameScene";
 import { Food } from "./Food";
 import { GameState, tailCells } from "./schemas/Food";
 import { roomEntry } from "./matchmaking";
+import { feature } from "./feature";
 import { scoreboardRows } from "./utils/scoreboardLayout";
 
 class SocketManager {
@@ -38,7 +39,7 @@ class SocketManager {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       this.client = new Client(`${protocol}//${host}/colyseus`);
-      const entry = roomEntry(scene.vsBot);
+      const entry = roomEntry(scene.vsBot, feature.botReactionTicks);
       this.room = await this.client[entry.method]<GameState>("snake", {
         playerId,
         token,
