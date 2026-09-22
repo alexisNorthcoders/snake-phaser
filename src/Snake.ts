@@ -16,8 +16,8 @@ export interface GridPosition {
     y: number
 }
 
-// The server's gameConfig: 8 ticks a second on a 20-cell board.
-const TICK_MS = 1000 / 8
+// Used until the room's synced state (state.tickMs) arrives, and matches the server's default of 8 ticks a second.
+const DEFAULT_TICK_MS = 125
 const BOARD_CELLS = 20
 
 export class Snake {
@@ -38,7 +38,7 @@ export class Snake {
     public colors: Required<SnakeColorSet>
 
     // Head first, then the tail in body order.
-    private body = new BodyTween(TICK_MS, BOARD_CELLS)
+    private body: BodyTween
     private size: number
 
     constructor(
@@ -46,10 +46,12 @@ export class Snake {
         x: number = 2,
         y: number = 4,
         colors: SnakeColorSet = {},
-        size: number = 0
+        size: number = 0,
+        tickMs: number = DEFAULT_TICK_MS
     ) {
         this.scene = scene
         this.size = size
+        this.body = new BodyTween(tickMs > 0 ? tickMs : DEFAULT_TICK_MS, BOARD_CELLS)
         this.body.retarget([{ x, y }], performance.now())
 
         this.gridSize = Math.floor(Math.min(scene.scale.width, scene.scale.height) / BOARD_CELLS);

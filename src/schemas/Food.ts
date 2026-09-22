@@ -59,6 +59,8 @@ export class Player extends Schema {
 export class GameState extends Schema {
     @type("string") phase: Phase = "lobby";
     @type("number") countdown: number = 0;
+    /** Length of one simulation tick in ms, fixed at room creation, so clients can pace their animation. */
+    @type("number") tickMs: number = 125;
     @type("number") aliveCount: number = 0;
     @type("number") backgroundNumber: number = 0;
     @type([Player]) players = new ArraySchema<Player>();
