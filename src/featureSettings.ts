@@ -17,6 +17,8 @@ export interface FeatureSettings {
     backgroundDim: number
     /** Shows the "Play vs Computer" entry point in the lobby. Off until the vs-bot mode ships. */
     vsBot: boolean
+    /** How many ticks the bot waits before reacting, an integer 0–4. One tick is one move, 125 ms. Sent when a vs-bot room is created. */
+    botReactionTicks: number
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -32,10 +34,12 @@ const MIN_WIDTH = 0.5
 const MAX_WIDTH = 1
 const MIN_DIM = 0
 const MAX_DIM = 1
+const MIN_REACTION_TICKS = 0
+const MAX_REACTION_TICKS = 4
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'vsBot'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'vsBot' | 'botReactionTicks'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, vsBot: false }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, vsBot: false, botReactionTicks: 2 }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -97,6 +101,16 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return DEFAULTS.vsBot
     }
 
+    const botReactionTicks = (value: unknown): number => {
+        if (typeof value !== 'number' || !Number.isInteger(value)) {
+            warn(`botReactionTicks must be an integer, got ${JSON.stringify(value)}; using ${DEFAULTS.botReactionTicks}`)
+            return DEFAULTS.botReactionTicks
+        }
+        const clamped = Math.min(MAX_REACTION_TICKS, Math.max(MIN_REACTION_TICKS, value))
+        if (clamped !== value) warn(`botReactionTicks ${value} is outside ${MIN_REACTION_TICKS}–${MAX_REACTION_TICKS}; clamped to ${clamped}`)
+        return clamped
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
@@ -107,6 +121,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         assetTheme: 'assetTheme' in stored ? assetTheme(stored.assetTheme) : DEFAULTS.assetTheme,
         backgroundDim: 'backgroundDim' in stored ? backgroundDim(stored.backgroundDim) : DEFAULTS.backgroundDim,
         vsBot: 'vsBot' in stored ? vsBotFlag(stored.vsBot) : DEFAULTS.vsBot,
+        botReactionTicks: 'botReactionTicks' in stored ? botReactionTicks(stored.botReactionTicks) : DEFAULTS.botReactionTicks,
     }
     const save = () => {
         try {
@@ -166,6 +181,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.vsBot = vsBotFlag(show)
             save()
         },
+        get botReactionTicks() { return values.botReactionTicks },
+        set botReactionTicks(ticks) {
+            values.botReactionTicks = botReactionTicks(ticks)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
@@ -177,6 +197,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.assetTheme = '${values.assetTheme}'    // ${ASSET_THEMES.map((theme) => `'${theme}'`).join(' | ')}, folder food textures load from (reload to apply)`,
                 `  feature.backgroundDim = ${values.backgroundDim}    // ${MIN_DIM}–${MAX_DIM}, dims the background behind the board (applies immediately)`,
                 `  feature.vsBot = ${values.vsBot}    // true | false, shows "Play vs Computer" in the lobby (reload to apply)`,
+                `  feature.botReactionTicks = ${values.botReactionTicks}    // ${MIN_REACTION_TICKS}–${MAX_REACTION_TICKS} ticks (1 tick = 125 ms), bot reaction time, used by the next "Play vs Computer"`,
             ].join('\n'))
         },
     }

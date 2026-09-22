@@ -198,3 +198,33 @@ test('vsBot is off by default, survives a reload, and a non-boolean warns and re
   assert.equal(feature.vsBot, false);
   assert.match(out.lines.join('\n'), /vsBot/);
 });
+
+test('botReactionTicks defaults to 2, persists, clamps to 0–4 with a warning, and rejects non-integers', () => {
+  const storage = new MemoryStorage();
+  const out = quietLog();
+  const feature = createFeatureSettings(storage, out);
+  assert.equal(feature.botReactionTicks, 2);
+
+  feature.botReactionTicks = 3;
+  assert.equal(createFeatureSettings(storage, quietLog()).botReactionTicks, 3);
+
+  feature.botReactionTicks = 9;
+  assert.equal(feature.botReactionTicks, 4);
+  feature.botReactionTicks = -1;
+  assert.equal(feature.botReactionTicks, 0);
+  assert.match(out.lines.join('\n'), /botReactionTicks.*clamped/);
+
+  feature.botReactionTicks = 1.5;
+  assert.equal(feature.botReactionTicks, 2);
+  feature.botReactionTicks = 'fast' as never;
+  assert.equal(feature.botReactionTicks, 2);
+
+  storage.setItem('feature', JSON.stringify({ botReactionTicks: 'x' }));
+  assert.equal(createFeatureSettings(storage, quietLog()).botReactionTicks, 2);
+});
+
+test('list() shows botReactionTicks', () => {
+  const out = quietLog();
+  createFeatureSettings(new MemoryStorage(), out).list();
+  assert.match(out.lines.join('\n'), /feature\.botReactionTicks = 2.*0–4/);
+});
