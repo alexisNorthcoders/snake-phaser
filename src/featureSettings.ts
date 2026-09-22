@@ -19,6 +19,8 @@ export interface FeatureSettings {
     vsBot: boolean
     /** How many ticks the bot waits before reacting, an integer 0–4. One tick is one move, 125 ms. Sent when a vs-bot room is created. */
     botReactionTicks: number
+    /** Ticks per second the room simulates at, an integer 4–15. Sent as `speed` when entering a room. */
+    gameSpeed: number
     /** Prints every setting with its current value and the values it accepts. */
     list(): void
 }
@@ -36,10 +38,12 @@ const MIN_DIM = 0
 const MAX_DIM = 1
 const MIN_REACTION_TICKS = 0
 const MAX_REACTION_TICKS = 4
+const MIN_GAME_SPEED = 4
+const MAX_GAME_SPEED = 15
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'vsBot' | 'botReactionTicks'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'vsBot' | 'botReactionTicks' | 'gameSpeed'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, vsBot: false, botReactionTicks: 2 }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, vsBot: false, botReactionTicks: 2, gameSpeed: 8 }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -111,6 +115,16 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return clamped
     }
 
+    const gameSpeed = (value: unknown): number => {
+        if (typeof value !== 'number' || !Number.isInteger(value)) {
+            warn(`gameSpeed must be an integer, got ${JSON.stringify(value)}; using ${DEFAULTS.gameSpeed}`)
+            return DEFAULTS.gameSpeed
+        }
+        const clamped = Math.min(MAX_GAME_SPEED, Math.max(MIN_GAME_SPEED, value))
+        if (clamped !== value) warn(`gameSpeed ${value} is outside ${MIN_GAME_SPEED}–${MAX_GAME_SPEED}; clamped to ${clamped}`)
+        return clamped
+    }
+
     const stored = readStored()
     const values: Values = {
         snakeBody: 'snakeBody' in stored ? bodyStyle(stored.snakeBody) : DEFAULTS.snakeBody,
@@ -122,6 +136,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         backgroundDim: 'backgroundDim' in stored ? backgroundDim(stored.backgroundDim) : DEFAULTS.backgroundDim,
         vsBot: 'vsBot' in stored ? vsBotFlag(stored.vsBot) : DEFAULTS.vsBot,
         botReactionTicks: 'botReactionTicks' in stored ? botReactionTicks(stored.botReactionTicks) : DEFAULTS.botReactionTicks,
+        gameSpeed: 'gameSpeed' in stored ? gameSpeed(stored.gameSpeed) : DEFAULTS.gameSpeed,
     }
     const save = () => {
         try {
@@ -186,6 +201,11 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.botReactionTicks = botReactionTicks(ticks)
             save()
         },
+        get gameSpeed() { return values.gameSpeed },
+        set gameSpeed(speed) {
+            values.gameSpeed = gameSpeed(speed)
+            save()
+        },
         list() {
             log([
                 'settings (assign in the console to change them):',
@@ -198,6 +218,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.backgroundDim = ${values.backgroundDim}    // ${MIN_DIM}–${MAX_DIM}, dims the background behind the board (applies immediately)`,
                 `  feature.vsBot = ${values.vsBot}    // true | false, shows "Play vs Computer" in the lobby (reload to apply)`,
                 `  feature.botReactionTicks = ${values.botReactionTicks}    // ${MIN_REACTION_TICKS}–${MAX_REACTION_TICKS} ticks (1 tick = 125 ms), bot reaction time, used by the next "Play vs Computer"`,
+                `  feature.gameSpeed = ${values.gameSpeed}    // ${MIN_GAME_SPEED}–${MAX_GAME_SPEED} ticks per second, sent as 'speed' when entering the next room`,
             ].join('\n'))
         },
     }

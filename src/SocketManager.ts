@@ -39,7 +39,7 @@ class SocketManager {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       this.client = new Client(`${protocol}//${host}/colyseus`);
-      const entry = roomEntry(scene.vsBot, feature.botReactionTicks);
+      const entry = roomEntry(scene.vsBot, feature.botReactionTicks, feature.gameSpeed);
       this.room = await this.client[entry.method]<GameState>("snake", {
         playerId,
         token,
@@ -171,7 +171,8 @@ class SocketManager {
                 player.snake.x,
                 player.snake.y,
                 player.colours,
-                player.snake.size
+                player.snake.size,
+                state.tickMs
               );
               scene.snakes.set(player.id, newSnake);
             }

@@ -228,3 +228,33 @@ test('list() shows botReactionTicks', () => {
   createFeatureSettings(new MemoryStorage(), out).list();
   assert.match(out.lines.join('\n'), /feature\.botReactionTicks = 2.*0–4/);
 });
+
+test('gameSpeed defaults to 8, persists, clamps to 4–15 with a warning, and rejects non-integers', () => {
+  const storage = new MemoryStorage();
+  const out = quietLog();
+  const feature = createFeatureSettings(storage, out);
+  assert.equal(feature.gameSpeed, 8);
+
+  feature.gameSpeed = 6;
+  assert.equal(createFeatureSettings(storage, quietLog()).gameSpeed, 6);
+
+  feature.gameSpeed = 20;
+  assert.equal(feature.gameSpeed, 15);
+  feature.gameSpeed = 1;
+  assert.equal(feature.gameSpeed, 4);
+  assert.match(out.lines.join('\n'), /gameSpeed.*clamped/);
+
+  feature.gameSpeed = 7.5;
+  assert.equal(feature.gameSpeed, 8);
+  feature.gameSpeed = 'fast' as never;
+  assert.equal(feature.gameSpeed, 8);
+
+  storage.setItem('feature', JSON.stringify({ gameSpeed: 'x' }));
+  assert.equal(createFeatureSettings(storage, quietLog()).gameSpeed, 8);
+});
+
+test('list() shows gameSpeed', () => {
+  const out = quietLog();
+  createFeatureSettings(new MemoryStorage(), out).list();
+  assert.match(out.lines.join('\n'), /feature\.gameSpeed = 8.*4–15/);
+});
