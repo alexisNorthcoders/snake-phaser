@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  LEADERBOARD_MODE_BUTTON,
   LEADERBOARD_PANEL,
+  LEADERBOARD_REFRESH_BUTTON,
   computeLeaderboardPanelLayout,
   globalRows,
   mineRows,
@@ -28,6 +30,18 @@ test('columns run rank, name, then score right-aligned to the content edge', () 
   const l = computeLeaderboardPanelLayout();
   assert.ok(l.rankX < l.nameX && l.nameX < l.scoreRight);
   assert.equal(l.scoreRight, 120 + 560 - 24);
+});
+
+test('the Timed / Endless switch sits in the header between the tabs and Refresh', () => {
+  const l = computeLeaderboardPanelLayout();
+  const b = LEADERBOARD_MODE_BUTTON;
+  assert.equal(l.modeButtonXs.length, 2);
+  assert.ok(l.modeButtonXs[1] >= l.modeButtonXs[0] + b.width);
+  // Room for the Global / Mine tabs on the left.
+  assert.ok(l.modeButtonXs[0] - l.contentX >= 180);
+  assert.ok(l.modeButtonXs[1] + b.width < l.refreshX);
+  assert.equal(l.refreshX + LEADERBOARD_REFRESH_BUTTON.width, l.contentX + l.contentWidth);
+  assert.ok(b.height <= l.headerHeight && LEADERBOARD_REFRESH_BUTTON.height <= l.headerHeight);
 });
 
 test('global rows keep the top five with ranks and names', () => {

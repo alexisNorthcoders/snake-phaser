@@ -19,9 +19,9 @@ export const MODE_BLURBS: Record<GameMode, string> = {
   endless: 'Endless: last snake alive wins — don’t starve',
 };
 
-/** `value` as a mode, or `timed` when it isn't one, the same fallback as the server. */
-export function modeOf(value: unknown): GameMode {
-  return GAME_MODES.includes(value as GameMode) ? (value as GameMode) : DEFAULT_MODE;
+/** `value` as a mode, or `fallback` (timed, the same as the server's) when it isn't one. */
+export function modeOf(value: unknown, fallback: GameMode = DEFAULT_MODE): GameMode {
+  return GAME_MODES.includes(value as GameMode) ? (value as GameMode) : fallback;
 }
 
 export interface ModeStore {

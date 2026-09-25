@@ -1,3 +1,5 @@
+import { GAME_MODES } from '../gameMode.ts';
+
 export type LeaderboardTab = 'global' | 'mine';
 
 export const LEADERBOARD_ROWS = 5;
@@ -11,6 +13,11 @@ const RANK_WIDTH = 40;
 
 export const LEADERBOARD_REFRESH_BUTTON = { width: 90, height: 24 } as const;
 export const LEADERBOARD_TAB_GAP = 24;
+/** One Timed / Endless button; the pair sits left of Refresh. */
+export const LEADERBOARD_MODE_BUTTON = { width: 76, height: 24 } as const;
+const MODE_BUTTON_GAP = 8;
+/** Space between the Timed / Endless switch and the Refresh button. */
+const MODE_SWITCH_GAP = 24;
 
 /** Panel box: 560 wide at (120, 600), tall enough for the header and five rows plus padding. */
 export const LEADERBOARD_PANEL = {
@@ -28,6 +35,9 @@ export interface LeaderboardPanelLayout {
   headerHeight: number;
   rowsY: number;
   rowHeight: number;
+  /** Left edge of each mode button, in `GAME_MODES` order. */
+  modeButtonXs: number[];
+  refreshX: number;
   rankX: number;
   nameX: number;
   /** Right edge of the right-aligned score column. */
@@ -39,6 +49,9 @@ export function computeLeaderboardPanelLayout(): LeaderboardPanelLayout {
   const contentX = p.x + PADDING_X;
   const contentWidth = p.width - 2 * PADDING_X;
   const headerY = p.y + PADDING_Y;
+  const refreshX = contentX + contentWidth - LEADERBOARD_REFRESH_BUTTON.width;
+  const modeStep = LEADERBOARD_MODE_BUTTON.width + MODE_BUTTON_GAP;
+  const modeSwitchX = refreshX - MODE_SWITCH_GAP - (GAME_MODES.length * modeStep - MODE_BUTTON_GAP);
   return {
     contentX,
     contentWidth,
@@ -46,6 +59,8 @@ export function computeLeaderboardPanelLayout(): LeaderboardPanelLayout {
     headerHeight: HEADER_ROW_HEIGHT,
     rowsY: headerY + HEADER_ROW_HEIGHT + HEADER_GAP,
     rowHeight: ROW_HEIGHT,
+    modeButtonXs: GAME_MODES.map((_, i) => modeSwitchX + i * modeStep),
+    refreshX,
     rankX: contentX,
     nameX: contentX + RANK_WIDTH,
     scoreRight: contentX + contentWidth,

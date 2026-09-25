@@ -5,9 +5,9 @@ import { saveRoundScore, type RoundScoreSink } from '../src/roundScore.ts';
 function recordingSink() {
   const calls: string[] = [];
   const sink: RoundScoreSink = {
-    postUserScore: async (score) => { calls.push(`user ${score}`); },
-    postAnonymousScore: async (score) => { calls.push(`anonymous ${score}`); },
-    saveLocalScore: (score) => { calls.push(`local ${score}`); },
+    postUserScore: async (score, mode) => { calls.push(`user ${score} ${mode}`); },
+    postAnonymousScore: async (score, mode) => { calls.push(`anonymous ${score} ${mode}`); },
+    saveLocalScore: (score, mode) => { calls.push(`local ${score} ${mode}`); },
   };
   return { calls, sink };
 }
@@ -22,20 +22,20 @@ const lost = { rankings, winnerId: 'rival' };
 
 test('a logged-in player who won posts their own score once, to their account', async () => {
   const { calls, sink } = recordingSink();
-  await saveRoundScore(won, 'me', false, sink);
-  assert.deepEqual(calls, ['user 12']);
+  await saveRoundScore(won, 'me', false, 'timed', sink);
+  assert.deepEqual(calls, ['user 12 timed']);
 });
 
 test('a logged-in player who died posts their own score once, to their account', async () => {
   const { calls, sink } = recordingSink();
-  await saveRoundScore(lost, 'me', false, sink);
-  assert.deepEqual(calls, ['user 12']);
+  await saveRoundScore(lost, 'me', false, 'timed', sink);
+  assert.deepEqual(calls, ['user 12 timed']);
 });
 
 test("a guest posts their own score once, anonymously, and saves it in the local scores", async () => {
   const { calls, sink } = recordingSink();
-  await saveRoundScore({ rankings }, 'me', true, sink);
-  assert.deepEqual(calls.sort(), ['anonymous 12', 'local 12']);
+  await saveRoundScore({ rankings }, 'me', true, 'timed', sink);
+  assert.deepEqual(calls.sort(), ['anonymous 12 timed', 'local 12 timed']);
 });
 
 test("other snakes' scores are never posted", async () => {
@@ -47,12 +47,12 @@ test("other snakes' scores are never posted", async () => {
   ];
   for (const [sessionId, score] of [['rival', 30], ['me', 12], ['bot', 7]] as const) {
     const { calls, sink } = recordingSink();
-    await saveRoundScore({ rankings: shuffled }, sessionId, false, sink);
-    assert.deepEqual(calls, [`user ${score}`]);
+    await saveRoundScore({ rankings: shuffled }, sessionId, false, 'timed', sink);
+    assert.deepEqual(calls, [`user ${score} timed`]);
   }
   const { calls, sink } = recordingSink();
-  await saveRoundScore({ rankings: shuffled }, 'me', true, sink);
-  assert.deepEqual(calls.sort(), ['anonymous 12', 'local 12']);
+  await saveRoundScore({ rankings: shuffled }, 'me', true, 'timed', sink);
+  assert.deepEqual(calls.sort(), ['anonymous 12 timed', 'local 12 timed']);
 });
 
 test('a failed post is logged, never rejected', async () => {
@@ -66,7 +66,7 @@ test('a failed post is logged, never rejected', async () => {
       saveLocalScore: () => {},
     };
     for (const guest of [false, true]) {
-      await saveRoundScore({ rankings }, 'me', guest, failing);
+      await saveRoundScore({ rankings }, 'me', guest, 'timed', failing);
     }
     assert.equal(warnings.length, 2);
   } finally {
@@ -78,8 +78,16 @@ test('a payload without your entry posts nothing', async () => {
   for (const sessionId of ['gone', undefined]) {
     for (const guest of [false, true]) {
       const { calls, sink } = recordingSink();
-      await saveRoundScore({ rankings }, sessionId, guest, sink);
+      await saveRoundScore({ rankings }, sessionId, guest, 'timed', sink);
       assert.deepEqual(calls, []);
     }
+  }
+});
+
+test("every save carries the room's mode", async () => {
+  for (const guest of [false, true]) {
+    const { calls, sink } = recordingSink();
+    await saveRoundScore({ rankings }, 'me', guest, 'endless', sink);
+    assert.deepEqual(calls.sort(), guest ? ['anonymous 12 endless', 'local 12 endless'] : ['user 12 endless']);
   }
 });

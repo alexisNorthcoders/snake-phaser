@@ -19,7 +19,7 @@ import { createFpsMeter, formatFpsReadout } from '../fpsMeter';
 import { createAccountAppearanceStore, createAppearanceStore, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
-import { createModeStore, GAME_MODES, MODE_BLURBS, MODE_LABELS, type GameMode } from '../gameMode';
+import { createModeStore, GAME_MODES, MODE_BLURBS, MODE_LABELS, modeOf, type GameMode } from '../gameMode';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
 import { PixelButton } from '../PixelButton';
@@ -223,7 +223,10 @@ export class GameScene extends Phaser.Scene {
     this.mode = mode;
     modeStore.save(mode);
     this.refreshModeRow();
-    if (!this.sessionConnected) return;
+    if (!this.sessionConnected) {
+      this.leaderboardPanel?.setMode(mode);
+      return;
+    }
     this.commitName();
     socketManager.close();
     this.scene.restart();
@@ -687,8 +690,8 @@ export class GameScene extends Phaser.Scene {
     this.destroyLeaderboardPanel();
     this.leaderboardPanel = new LeaderboardPanel(this, {
       fetchGlobal: getLeaderboard,
-      loadMine: () => LocalScoresManager.getTopScores(5),
-    });
+      loadMine: (mode) => LocalScoresManager.getTopScores(mode, 5),
+    }, this.mode);
   }
 
   private destroyLeaderboardPanel(): void {
@@ -761,22 +764,24 @@ export class GameScene extends Phaser.Scene {
     console.log("[GameScene] Game over callback", payload);
     this.isGameOver = true;
     this.clearGameOverOverlay();
+    const roundMode = modeOf(socketManager.getRoom()?.state.mode);
 
     // Saved alongside, not before, the end screen: a slow or failed post never holds it up.
-    void saveRoundScore(payload, socketManager.getRoom()?.sessionId, this.guest, {
+    void saveRoundScore(payload, socketManager.getRoom()?.sessionId, this.guest, roundMode, {
       postUserScore,
-      postAnonymousScore: async (score) => {
-        const result = await postAnonymousScore(ClientIdManager.getOrCreateClientId(), score);
+      postAnonymousScore: async (score, mode) => {
+        const result = await postAnonymousScore(ClientIdManager.getOrCreateClientId(), score, mode);
         if (!result.success) console.warn('[GameScene] Failed to submit score to server:', result.message);
       },
-      saveLocalScore: (score) => LocalScoresManager.saveScore(score),
+      saveLocalScore: (score, mode) => LocalScoresManager.saveScore(score, mode),
     });
 
-    this.displayGameOverScreen(payload);
+    this.displayGameOverScreen(payload, roundMode);
   }
 
-  private async displayGameOverScreen(payload: GameOverPayload) {
-    const topScores: HighScore[] = (await getHighScores()).slice(0, 3);
+  /** `mode` is the round's, and picks the top scores shown. */
+  private async displayGameOverScreen(payload: GameOverPayload, mode: GameMode) {
+    const topScores: HighScore[] = (await getHighScores(mode)).slice(0, 3);
     const rankings = payload?.rankings ?? [];
     const sessionId = socketManager.getRoom()?.sessionId;
 
@@ -846,7 +851,7 @@ export class GameScene extends Phaser.Scene {
       cause.setScale(Math.min(1, (contentWidth - NAME_X) / Math.max(1, cause.width)));
     });
 
-    addText(centerX, panelY + c.subheadingY + 16, 'Top scores', 22, '#ff4444');
+    addText(centerX, panelY + c.subheadingY + 16, `Top scores — ${MODE_LABELS[mode]}`, 22, '#ff4444');
 
     if (topScores.length > 0) {
       topScores.forEach((hs, i) => {

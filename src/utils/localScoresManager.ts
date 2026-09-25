@@ -1,9 +1,29 @@
-import { ClientIdManager } from './clientIdManager';
+import { ClientIdManager } from './clientIdManager.ts';
+import { modeOf, type GameMode } from '../gameMode.ts';
 
 export interface LocalScore {
   clientId: string;
   score: number;
   timestamp: number;
+  /** Missing on entries saved before scores had a mode; see `localScoreMode`. */
+  mode?: GameMode;
+}
+
+/** The mode a local score was played in; entries saved before scores had one count as endless, as on the server. */
+export function localScoreMode(entry: { mode?: unknown }): GameMode {
+  return modeOf(entry.mode, 'endless');
+}
+
+/** The best `limit` of `entries` played in `mode`, highest first. */
+export function topScoresForMode<T extends { score: number; mode?: unknown }>(
+  entries: readonly T[],
+  mode: GameMode,
+  limit: number,
+): T[] {
+  return entries
+    .filter((e) => localScoreMode(e) === mode)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 const SCORES_KEY = 'localScores';
@@ -16,7 +36,7 @@ export class LocalScoresManager {
    * This is by design — persistence across sessions requires authentication.
    * Users can authenticate after a game to ensure their scores are persisted in the server database.
    */
-  static saveScore(score: number): void {
+  static saveScore(score: number, mode: GameMode): void {
     const clientId = ClientIdManager.getOrCreateClientId();
     const timestamp = Date.now();
 
@@ -26,11 +46,12 @@ export class LocalScoresManager {
       allScores.push({
         clientId,
         score,
-        timestamp
+        timestamp,
+        mode,
       });
 
       localStorage.setItem(SCORES_KEY, JSON.stringify(allScores));
-      console.log(`[LocalScoresManager] Saved score: ${score} for client ${clientId}`);
+      console.log(`[LocalScoresManager] Saved ${mode} score: ${score} for client ${clientId}`);
     } catch (error) {
       console.error('[LocalScoresManager] Failed to save score to localStorage:', error);
 
@@ -65,11 +86,8 @@ export class LocalScoresManager {
     return allScores.filter(s => s.clientId === clientId);
   }
 
-  static getTopScores(limit: number = 5): LocalScore[] {
-    const clientScores = this.getClientScores();
-    return clientScores
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+  static getTopScores(mode: GameMode, limit: number = 5): LocalScore[] {
+    return topScoresForMode(this.getClientScores(), mode, limit);
   }
 
   static clearAllScores(): void {
