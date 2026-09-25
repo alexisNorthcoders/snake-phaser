@@ -107,9 +107,9 @@ export class LeaderboardPanel {
     this.render();
   }
 
-  /** Shows `mode`'s boards: Mine at once, Global once its fetch lands. */
+  /** Shows `mode`'s boards: Mine at once, Global once its fetch lands. Refetches even when `mode` is already shown. */
   setMode(mode: GameMode): void {
-    if (this.destroyed || mode === this.mode) return;
+    if (this.destroyed) return;
     this.mode = mode;
     this.globalEntries = undefined;
     this.refresh();

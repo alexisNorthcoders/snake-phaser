@@ -86,6 +86,8 @@ export class GameScene extends Phaser.Scene {
   private modeLabel?: Phaser.GameObjects.Text;
   private modeButtons = new Map<GameMode, PixelButton>();
   private modeBlurb?: Phaser.GameObjects.Text;
+  /** The synced mode of the round being played, taken when it starts so game over saves and shows scores for that round. */
+  private roundMode?: GameMode;
   public playerId: string = '';
   public gameConfigured: boolean = false
   public snakes: Map<string, Snake> = new Map();
@@ -758,13 +760,14 @@ export class GameScene extends Phaser.Scene {
 
     // Initialize game state
     this.isGameOver = false;
+    this.roundMode = modeOf(socketManager.getRoom()?.state.mode ?? this.mode);
   }
 
   onGameOver(payload: GameOverPayload) {
     console.log("[GameScene] Game over callback", payload);
     this.isGameOver = true;
     this.clearGameOverOverlay();
-    const roundMode = modeOf(socketManager.getRoom()?.state.mode);
+    const roundMode = this.roundMode ?? modeOf(socketManager.getRoom()?.state.mode ?? this.mode);
 
     // Saved alongside, not before, the end screen: a slow or failed post never holds it up.
     void saveRoundScore(payload, socketManager.getRoom()?.sessionId, this.guest, roundMode, {
