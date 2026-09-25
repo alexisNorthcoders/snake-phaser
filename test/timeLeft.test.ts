@@ -40,13 +40,11 @@ test('the last ten seconds are urgent', () => {
   assert.deepEqual(hudTimeLeft('playing', 'timed', 1, 125), { label: '0:01', urgent: true });
 });
 
-test('the time stays up, at 0:00, once the round has ended', () => {
-  assert.deepEqual(hudTimeLeft('ended', 'timed', 0, 125), { label: '0:00', urgent: true });
-});
-
-test('no timer in the lobby, the countdown, or an endless game', () => {
+test('no timer in the lobby, the countdown, after the round, or in an endless game', () => {
   assert.equal(hudTimeLeft('lobby', 'timed', 1440, 125), null);
   assert.equal(hudTimeLeft('countdown', 'timed', 1440, 125), null);
+  assert.equal(hudTimeLeft('ended', 'timed', 0, 125), null);
+  assert.equal(hudTimeLeft('ended', 'timed', 664, 125), null);
   assert.equal(hudTimeLeft('playing', 'endless', 0, 125), null);
   assert.equal(hudTimeLeft('ended', 'endless', 0, 125), null);
 });

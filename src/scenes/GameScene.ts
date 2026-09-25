@@ -26,6 +26,7 @@ import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
+import type { HudTimeLeft } from '../timeLeft';
 import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
@@ -878,7 +879,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Called on every room state patch: the header's time left in a timed round, right-aligned beside the header button. Null hides it. */
-  setTimeLeft(timeLeft: { label: string; urgent: boolean } | null) {
+  setTimeLeft(timeLeft: HudTimeLeft | null) {
     if (timeLeft === null) {
       this.destroyTimeLeftText();
       return;
