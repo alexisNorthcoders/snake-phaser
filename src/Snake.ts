@@ -19,6 +19,9 @@ export interface GridPosition {
 // Used until the room's synced state (state.tickMs) arrives, and matches the server's default of 8 ticks a second.
 const DEFAULT_TICK_MS = 125
 const BOARD_CELLS = 20
+const STARVING_COLOUR = 0xff4444
+/** One full pulse of the starving hint. */
+const STARVING_PULSE_MS = 700
 
 export class Snake {
     private scene: Phaser.Scene
@@ -34,6 +37,10 @@ export class Snake {
     public glow: boolean = false
     public transparent: number = 1
     public speed: GridPosition = { x: 1, y: 0 }
+    /** Score the snake's hunger drain began from, or would begin from while it is fed; see `trackHunger`. */
+    public hungerStartScore?: number
+    /** An opponent that is starving: a pulsing ring round its head shows it's in trouble. */
+    public starving: boolean = false
 
     public colors: Required<SnakeColorSet>
 
@@ -118,6 +125,19 @@ export class Snake {
         }
 
         drawSnake({ graphics, bodyGraphics: this.bodyGraphics }, drawing)
+        if (this.starving && !this.isDead) this.drawStarvingHint(drawing.headCell ?? segments[0], yOffset, now)
+    }
+
+    /** A red ring round the head, pulsing: clearly visible, but thin enough to leave the head and board readable. */
+    private drawStarvingHint(head: GridPosition, yOffset: number, now: number): void {
+        const { gridSize } = this
+        const pulse = (Math.sin(now / STARVING_PULSE_MS * Math.PI * 2) + 1) / 2
+        this.graphics.lineStyle(2, STARVING_COLOUR, 0.35 + 0.55 * pulse)
+        this.graphics.strokeCircle(
+            (head.x + 0.5) * gridSize,
+            yOffset + (head.y + 0.5) * gridSize,
+            gridSize * (0.75 + 0.15 * pulse)
+        )
     }
 
     destroy(): void {

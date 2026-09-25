@@ -49,8 +49,13 @@ interface GameOverPayload {
 const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
 const modeStore = createModeStore(localStorageOrNothing());
-/** Space between the header timer and the header button on its right. */
-const TIME_LEFT_GAP = 16;
+/** Space between the header timer or hunger bar and the header button on its right. */
+const HEADER_ITEM_GAP = 16;
+/**
+ * The header hunger bar, in the timer's place beside the header button: endless rounds, which starve, have no timer.
+ * Its `label` sits left of the bar.
+ */
+const HUNGER_BAR = { width: 120, height: 14, labelGap: 8, fillColour: 0xff4444, emptyColour: 0x333333 } as const;
 
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
@@ -58,6 +63,8 @@ export class GameScene extends Phaser.Scene {
   public pingText!: Phaser.GameObjects.Text;
   private pingBars?: Phaser.GameObjects.Graphics;
   private timeLeftText?: Phaser.GameObjects.Text;
+  private hungerBar?: Phaser.GameObjects.Graphics;
+  private hungerLabel?: Phaser.GameObjects.Text;
   private fpsText?: Phaser.GameObjects.Text;
   private fpsMeter = createFpsMeter();
   public scoreboard?: ScoreboardPanel;
@@ -459,6 +466,7 @@ export class GameScene extends Phaser.Scene {
       this.destroyLobbyAmbience();
       this.resetCountdown();
       this.destroyTimeLeftText();
+      this.destroyHungerBar();
     });
 
     this.scoreboard?.destroy();
@@ -886,7 +894,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (!this.timeLeftText) {
       const { x } = headerButtonPosition(this.scale.width);
-      this.timeLeftText = this.add.text(x - TIME_LEFT_GAP, HEADER.height / 2, '', {
+      this.timeLeftText = this.add.text(x - HEADER_ITEM_GAP, HEADER.height / 2, '', {
         fontFamily: FONT_FAMILY, fontSize: '28px', stroke: '#000000', strokeThickness: 4,
       }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10);
     }
@@ -896,6 +904,38 @@ export class GameScene extends Phaser.Scene {
   private destroyTimeLeftText() {
     this.timeLeftText?.destroy();
     this.timeLeftText = undefined;
+  }
+
+  /** Called on every room state patch: your snake's hunger bar while it starves, from 1 (full) to 0. Null hides it. */
+  setHungerFill(fill: number | null) {
+    if (fill === null) {
+      this.destroyHungerBar();
+      return;
+    }
+    const right = headerButtonPosition(this.scale.width).x - HEADER_ITEM_GAP;
+    const left = right - HUNGER_BAR.width;
+    const top = (HEADER.height - HUNGER_BAR.height) / 2;
+    if (!this.hungerBar) {
+      this.hungerBar = this.add.graphics().setScrollFactor(0).setDepth(10);
+      this.hungerLabel = this.add.text(left - HUNGER_BAR.labelGap, HEADER.height / 2, 'Starving', {
+        fontFamily: FONT_FAMILY, fontSize: '20px', color: '#ff4444', stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10);
+    }
+    const g = this.hungerBar;
+    g.clear();
+    g.fillStyle(HUNGER_BAR.emptyColour, 1);
+    g.fillRect(left, top, HUNGER_BAR.width, HUNGER_BAR.height);
+    g.fillStyle(HUNGER_BAR.fillColour, 1);
+    g.fillRect(left, top, Math.round(HUNGER_BAR.width * fill), HUNGER_BAR.height);
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRect(left, top, HUNGER_BAR.width, HUNGER_BAR.height);
+  }
+
+  private destroyHungerBar() {
+    this.hungerBar?.destroy();
+    this.hungerBar = undefined;
+    this.hungerLabel?.destroy();
+    this.hungerLabel = undefined;
   }
 
   // Update the header ping readout and signal meter; undefined means no ping yet.
@@ -1026,6 +1066,7 @@ export class GameScene extends Phaser.Scene {
     this.pingBars?.destroy();
     this.pingBars = undefined;
     this.destroyTimeLeftText();
+    this.destroyHungerBar();
     this.headerButton?.destroy();
     this.headerButton = undefined;
     this.destroyLobbyPanel();

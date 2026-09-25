@@ -4,6 +4,7 @@ import { GameScene } from "./scenes/GameScene";
 import { Food } from "./Food";
 import { GameState, tailCells } from "./schemas/Food";
 import { hudTimeLeft } from "./timeLeft";
+import { trackHunger } from "./hunger";
 import { roomEntry } from "./matchmaking";
 import { feature } from "./feature";
 import { scoreboardRows } from "./utils/scoreboardLayout";
@@ -142,13 +143,20 @@ class SocketManager {
         scene.onPhaseState?.(state.phase, state.countdown);
         scene.setTimeLeft?.(hudTimeLeft(state.phase, state.mode, state.ticksLeft, state.tickMs));
 
+        let ownHungerFill: number | null = null;
         state.players.forEach((player) => {
           if (player.snake) {
             const currentSnake = scene.snakes.get(player.id);
             if (currentSnake) {
-              // Update existing snake
+              const hunger = trackHunger(currentSnake.hungerStartScore, state, player.snake);
+              currentSnake.hungerStartScore = hunger.startScore;
+
+              // Update existing snake. Your own hunger is the HUD bar; opponents only carry the hint.
               if (player.id === this.room?.sessionId) {
                 scene.scoreText.setText(`Score: ${player.snake.score}`);
+                ownHungerFill = hunger.fill;
+              } else {
+                currentSnake.starving = hunger.fill !== null;
               }
 
               if (!currentSnake.isDead) {
@@ -180,6 +188,7 @@ class SocketManager {
             }
           }
         });
+        scene.setHungerFill?.(ownHungerFill);
       });
 
       this.startPingMeasurement(scene);
