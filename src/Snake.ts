@@ -4,6 +4,7 @@ import { arcBodyPath } from './BodyPath'
 import { unwrapChain, wrapCell } from './BodyWrap'
 import { drawSnake, type SnakeDrawing } from './SnakeDrawing'
 import { feature } from './feature'
+import type { GameMode } from './gameMode'
 
 interface SnakeColorSet {
     body?: string
@@ -153,7 +154,7 @@ export class Snake {
     }
 }
 
-export async function postUserScore(score: number): Promise<void> {
+export async function postUserScore(score: number, mode: GameMode): Promise<void> {
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
@@ -164,7 +165,7 @@ export async function postUserScore(score: number): Promise<void> {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${userData.token}`,
             },
-            body: JSON.stringify({ score }),
+            body: JSON.stringify({ score, mode }),
         });
 
         if (!response.ok) {
@@ -179,14 +180,14 @@ export async function postUserScore(score: number): Promise<void> {
     }
 }
 
-export async function postAnonymousScore(clientId: string, score: number): Promise<{ success: boolean; message: string }> {
+export async function postAnonymousScore(clientId: string, score: number, mode: GameMode): Promise<{ success: boolean; message: string }> {
     try {
         const response = await fetch("/api/scores/anonymous", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ clientId, score }),
+            body: JSON.stringify({ clientId, score, mode }),
         });
 
         if (response.status === 429) {
@@ -219,9 +220,10 @@ export interface HighScore {
     timestamp: string;
 }
 
-export async function getHighScores(): Promise<HighScore[]> {
+/** The best scores of every player, account or guest, in `mode`. */
+export async function getHighScores(mode: GameMode): Promise<HighScore[]> {
     try {
-        const response = await fetch("/api/high-scores", {
+        const response = await fetch(`/api/high-scores?mode=${mode}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -242,9 +244,10 @@ export async function getHighScores(): Promise<HighScore[]> {
     }
 }
 
-export async function getLeaderboard(): Promise<HighScore[]> {
+/** The best account scores in `mode`. */
+export async function getLeaderboard(mode: GameMode): Promise<HighScore[]> {
     try {
-        const response = await fetch("/api/leaderboard", {
+        const response = await fetch(`/api/leaderboard?mode=${mode}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
