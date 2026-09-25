@@ -1,4 +1,5 @@
-import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
+import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
+import { deathText, roundHeadline, type DeathCause, type RoundEndReason } from '../roundSummary';
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
 import { Food } from '../Food';
@@ -35,13 +36,17 @@ interface SnakeColors {
   eyes: string;
 }
 
+/** A snake that died has a `cause`, and `by` the snake it ran into; one alive at the end, or that left, has neither. */
 interface RankingEntry {
   id: string;
   name: string;
   score: number;
+  cause?: DeathCause;
+  by?: string;
 }
 
 interface GameOverPayload {
+  reason: RoundEndReason;
   winnerId?: string;
   rankings: RankingEntry[];
 }
@@ -781,13 +786,33 @@ export class GameScene extends Phaser.Scene {
     const rankings = payload?.rankings ?? [];
     const sessionId = socketManager.getRoom()?.sessionId;
 
-    const { centerX, panelWidth } = computeGameOverLayout(this.scale.width);
-    const c = computeGameOverContentLayout(rankings.length, topScores.length, this.guest);
+    const players = socketManager.getRoom()?.state.players;
+    const snakes = rankings.map((entry) => ({
+      ...entry,
+      isBot: !!players?.find((p) => p.id === entry.id)?.isBot,
+    }));
+
+    const { centerX, panelWidth, contentWidth } = computeGameOverLayout(this.scale.width);
+    const DEPTH = 20;
+
+    // Made first: it wraps on a narrow panel, and its height places everything under it.
+    const headline = this.add
+      .text(centerX, 0, roundHeadline(payload.reason, payload.winnerId, snakes, sessionId), {
+        fontFamily: FONT_FAMILY,
+        fontSize: '20px',
+        color: '#ffffff',
+        align: 'center',
+        wordWrap: { width: contentWidth },
+      })
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(DEPTH);
+
+    const c = computeGameOverContentLayout(rankings.length, topScores.length, this.guest, headline.height);
     const panelX = centerX - panelWidth / 2;
     const panelY = Math.max(0, (this.scale.height - c.panelHeight) / 2);
     const contentX = panelX + c.padding;
-    const contentWidth = panelWidth - 2 * c.padding;
-    const DEPTH = 20;
+    headline.setY(panelY + c.headlineY);
 
     const frame = new FramedPanel(this, panelX, panelY, panelWidth, c.panelHeight, 0.8);
     frame.addDivider(contentX, panelY + c.dividerY, contentWidth);
@@ -807,17 +832,24 @@ export class GameScene extends Phaser.Scene {
     // Hard 4px/4px shadow behind the title
     addText(centerX + 4, panelY + c.titleY + 20 + 4, 'GAME OVER', 32, '#ff4444').setAlpha(0.35);
     addText(centerX, panelY + c.titleY + 20, 'GAME OVER', 32, '#ff4444');
+    // Pushed after the frame so it draws above it at the same depth.
+    this.gameOverObjects.push(headline);
+    this.children.bringToTop(headline);
 
+    // Where a row's name, and a ranking row's cause under it, start: right of the `#1` rank.
+    const NAME_X = 56;
     const addRow = (index: number, name: string, score: number, y: number, color: string) => {
       addText(contentX, y, `#${index + 1}`, 20, color, 0);
-      addText(contentX + 56, y, name, 20, color, 0);
+      addText(contentX + NAME_X, y, name, 20, color, 0);
       addText(contentX + contentWidth, y, String(score), 20, color, 1);
     };
 
-    rankings.forEach((entry, i) => {
-      const y = panelY + c.roomRowsY + i * GAME_OVER_ROW_HEIGHT + GAME_OVER_ROW_HEIGHT / 2;
-      const isBot = !!socketManager.getRoom()?.state.players.find((p) => p.id === entry.id)?.isBot;
-      addRow(i, rankingName(entry.name, isBot), entry.score, y, entry.id === sessionId ? '#ffff00' : '#ffffff');
+    snakes.forEach((snake, i) => {
+      const rowY = panelY + c.roomRowsY + i * GAME_OVER_RANKING_ROW.height;
+      addRow(i, rankingName(snake.name, snake.isBot), snake.score, rowY + GAME_OVER_RANKING_ROW.nameY, snake.id === sessionId ? '#ffff00' : '#ffffff');
+      const cause = addText(contentX + NAME_X, rowY + GAME_OVER_RANKING_ROW.causeY, deathText(snake, snakes, sessionId), 14, '#aaaaaa', 0);
+      // A long name can outrun a narrow panel; shrink the line rather than clip it.
+      cause.setScale(Math.min(1, (contentWidth - NAME_X) / Math.max(1, cause.width)));
     });
 
     addText(centerX, panelY + c.subheadingY + 16, 'Top scores', 22, '#ff4444');
