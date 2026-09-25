@@ -39,10 +39,38 @@ test("a guest posts their own score once, anonymously, and saves it in the local
 });
 
 test("other snakes' scores are never posted", async () => {
-  for (const guest of [false, true]) {
+  // Your entry is neither first nor last, and every score differs, so a wrong pick shows.
+  const shuffled = [
+    { id: 'rival', score: 30 },
+    { id: 'me', score: 12 },
+    { id: 'bot', score: 7 },
+  ];
+  for (const [sessionId, score] of [['rival', 30], ['me', 12], ['bot', 7]] as const) {
     const { calls, sink } = recordingSink();
-    await saveRoundScore({ rankings }, 'me', guest, sink);
-    assert.ok(calls.every((c) => c.endsWith(' 12')), calls.join(', '));
+    await saveRoundScore({ rankings: shuffled }, sessionId, false, sink);
+    assert.deepEqual(calls, [`user ${score}`]);
+  }
+  const { calls, sink } = recordingSink();
+  await saveRoundScore({ rankings: shuffled }, 'me', true, sink);
+  assert.deepEqual(calls.sort(), ['anonymous 12', 'local 12']);
+});
+
+test('a failed post is logged, never rejected', async () => {
+  const warn = console.warn;
+  const warnings: unknown[] = [];
+  console.warn = (...args) => { warnings.push(args); };
+  try {
+    const failing: RoundScoreSink = {
+      postUserScore: async () => { throw new Error('offline'); },
+      postAnonymousScore: async () => { throw new Error('offline'); },
+      saveLocalScore: () => {},
+    };
+    for (const guest of [false, true]) {
+      await saveRoundScore({ rankings }, 'me', guest, failing);
+    }
+    assert.equal(warnings.length, 2);
+  } finally {
+    console.warn = warn;
   }
 });
 
