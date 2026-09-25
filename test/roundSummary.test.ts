@@ -39,11 +39,16 @@ test('into you, it says so', () => {
   assert.equal(deathText({ ...viper, cause: 'head-on', by: 'you' }, snakes, 'you'), 'head-on with you');
 });
 
-test('into a player who has since left: named from their ranking row, or unnamed once gone from it', () => {
+test('into a player who has since left: named from their ranking row, or nothing once gone from it', () => {
   const leaver: RankedSnake = { id: 'leaver', name: 'Cobra', isBot: false };
   assert.equal(deathText({ ...you, cause: 'body', by: 'leaver' }, [...snakes, leaver], 'you'), "hit Cobra's body");
-  assert.equal(deathText({ ...you, cause: 'body', by: 'leaver' }, snakes, 'you'), "hit a snake's body");
-  assert.equal(deathText({ ...you, cause: 'head-on', by: 'leaver' }, snakes, 'you'), 'head-on with a snake');
+  assert.equal(deathText({ ...you, cause: 'body', by: 'leaver' }, snakes, 'you'), '');
+  assert.equal(deathText({ ...you, cause: 'head-on', by: 'leaver' }, snakes, 'you'), '');
+});
+
+test('into another snake with no `by`: nothing', () => {
+  assert.equal(deathText({ ...you, cause: 'body' }, snakes, 'you'), '');
+  assert.equal(deathText({ ...you, cause: 'head-on' }, snakes, 'you'), '');
 });
 
 test('alive at the end, or left mid-round: nothing', () => {
