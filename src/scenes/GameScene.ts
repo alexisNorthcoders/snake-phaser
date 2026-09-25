@@ -49,13 +49,13 @@ interface GameOverPayload {
 const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
 const modeStore = createModeStore(localStorageOrNothing());
-/** Space between the header timer and the header button on its right. */
-const TIME_LEFT_GAP = 16;
+/** Space between the header timer or hunger bar and the header button on its right. */
+const HEADER_ITEM_GAP = 16;
 /**
  * The header hunger bar, in the timer's place beside the header button: endless rounds, which starve, have no timer.
  * Its `label` sits left of the bar.
  */
-const HUNGER_BAR = { width: 120, height: 14, labelGap: 8, fill: 0xff4444, empty: 0x333333 } as const;
+const HUNGER_BAR = { width: 120, height: 14, labelGap: 8, fillColour: 0xff4444, emptyColour: 0x333333 } as const;
 
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
@@ -894,7 +894,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (!this.timeLeftText) {
       const { x } = headerButtonPosition(this.scale.width);
-      this.timeLeftText = this.add.text(x - TIME_LEFT_GAP, HEADER.height / 2, '', {
+      this.timeLeftText = this.add.text(x - HEADER_ITEM_GAP, HEADER.height / 2, '', {
         fontFamily: FONT_FAMILY, fontSize: '28px', stroke: '#000000', strokeThickness: 4,
       }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10);
     }
@@ -912,7 +912,7 @@ export class GameScene extends Phaser.Scene {
       this.destroyHungerBar();
       return;
     }
-    const right = headerButtonPosition(this.scale.width).x - TIME_LEFT_GAP;
+    const right = headerButtonPosition(this.scale.width).x - HEADER_ITEM_GAP;
     const left = right - HUNGER_BAR.width;
     const top = (HEADER.height - HUNGER_BAR.height) / 2;
     if (!this.hungerBar) {
@@ -923,9 +923,9 @@ export class GameScene extends Phaser.Scene {
     }
     const g = this.hungerBar;
     g.clear();
-    g.fillStyle(HUNGER_BAR.empty, 1);
+    g.fillStyle(HUNGER_BAR.emptyColour, 1);
     g.fillRect(left, top, HUNGER_BAR.width, HUNGER_BAR.height);
-    g.fillStyle(HUNGER_BAR.fill, 1);
+    g.fillStyle(HUNGER_BAR.fillColour, 1);
     g.fillRect(left, top, Math.round(HUNGER_BAR.width * fill), HUNGER_BAR.height);
     g.lineStyle(2, 0x000000, 1);
     g.strokeRect(left, top, HUNGER_BAR.width, HUNGER_BAR.height);

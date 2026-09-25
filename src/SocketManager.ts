@@ -150,13 +150,13 @@ class SocketManager {
             if (currentSnake) {
               const hunger = trackHunger(currentSnake.hungerStartScore, state, player.snake);
               currentSnake.hungerStartScore = hunger.startScore;
-              // Your own hunger is the HUD bar; opponents only carry the hint.
-              if (player.id === this.room?.sessionId) ownHungerFill = hunger.fill;
-              else currentSnake.starving = hunger.fill !== null;
 
-              // Update existing snake
+              // Update existing snake. Your own hunger is the HUD bar; opponents only carry the hint.
               if (player.id === this.room?.sessionId) {
                 scene.scoreText.setText(`Score: ${player.snake.score}`);
+                ownHungerFill = hunger.fill;
+              } else {
+                currentSnake.starving = hunger.fill !== null;
               }
 
               if (!currentSnake.isDead) {
