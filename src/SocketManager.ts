@@ -171,7 +171,7 @@ class SocketManager {
                 }
 
                 if (player.snake.isDead) {
-                  currentSnake.stop(player.id, player.snake.score, false);
+                  currentSnake.stop();
                 }
               }
             } else {
