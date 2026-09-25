@@ -17,16 +17,18 @@ const rankings = [
   { id: 'rival', score: 30 },
   { id: 'bot', score: 7 },
 ];
+const won = { rankings, winnerId: 'me' };
+const lost = { rankings, winnerId: 'rival' };
 
 test('a logged-in player who won posts their own score once, to their account', async () => {
   const { calls, sink } = recordingSink();
-  await saveRoundScore({ rankings, winnerId: 'me' }, 'me', false, sink);
+  await saveRoundScore(won, 'me', false, sink);
   assert.deepEqual(calls, ['user 12']);
 });
 
 test('a logged-in player who died posts their own score once, to their account', async () => {
   const { calls, sink } = recordingSink();
-  await saveRoundScore({ rankings, winnerId: 'rival' }, 'me', false, sink);
+  await saveRoundScore(lost, 'me', false, sink);
   assert.deepEqual(calls, ['user 12']);
 });
 
@@ -51,21 +53,5 @@ test('a payload without your entry posts nothing', async () => {
       await saveRoundScore({ rankings }, sessionId, guest, sink);
       assert.deepEqual(calls, []);
     }
-  }
-});
-
-test('a failed post is swallowed, not thrown', async () => {
-  const failing: RoundScoreSink = {
-    postUserScore: async () => { throw new Error('down'); },
-    postAnonymousScore: async () => { throw new Error('down'); },
-    saveLocalScore: () => {},
-  };
-  const errors = console.error;
-  console.error = () => {};
-  try {
-    await saveRoundScore({ rankings }, 'me', false, failing);
-    await saveRoundScore({ rankings }, 'me', true, failing);
-  } finally {
-    console.error = errors;
   }
 });

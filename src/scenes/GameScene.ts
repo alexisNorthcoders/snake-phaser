@@ -765,7 +765,10 @@ export class GameScene extends Phaser.Scene {
     // Saved alongside, not before, the end screen: a slow or failed post never holds it up.
     void saveRoundScore(payload, socketManager.getRoom()?.sessionId, this.guest, {
       postUserScore,
-      postAnonymousScore: (score) => postAnonymousScore(ClientIdManager.getOrCreateClientId(), score),
+      postAnonymousScore: async (score) => {
+        const result = await postAnonymousScore(ClientIdManager.getOrCreateClientId(), score);
+        if (!result.success) console.warn('[GameScene] Failed to submit score to server:', result.message);
+      },
       saveLocalScore: (score) => LocalScoresManager.saveScore(score),
     });
 
