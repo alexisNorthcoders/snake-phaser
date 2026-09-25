@@ -65,6 +65,8 @@ export class GameState extends Schema {
     /** Length of one simulation tick in ms, fixed at room creation, so clients can pace their animation. */
     @type("number") tickMs: number = 125;
     @type("number") aliveCount: number = 0;
+    /** Ticks left in a timed round, counted down each tick; this times `tickMs` is the ms left. Unused in an endless round. */
+    @type("number") ticksLeft: number = 0;
     @type("number") backgroundNumber: number = 0;
     @type([Player]) players = new ArraySchema<Player>();
     @type([Food]) foodCoordinates = new ArraySchema<Food>();
