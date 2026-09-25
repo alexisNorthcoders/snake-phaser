@@ -26,6 +26,7 @@ import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
+import type { HudTimeLeft } from '../timeLeft';
 import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
@@ -48,12 +49,15 @@ interface GameOverPayload {
 const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
 const modeStore = createModeStore(localStorageOrNothing());
+/** Space between the header timer and the header button on its right. */
+const TIME_LEFT_GAP = 16;
 
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
   public scoreText!: Phaser.GameObjects.Text;
   public pingText!: Phaser.GameObjects.Text;
   private pingBars?: Phaser.GameObjects.Graphics;
+  private timeLeftText?: Phaser.GameObjects.Text;
   private fpsText?: Phaser.GameObjects.Text;
   private fpsMeter = createFpsMeter();
   public scoreboard?: ScoreboardPanel;
@@ -454,6 +458,7 @@ export class GameScene extends Phaser.Scene {
       this.destroyFpsText();
       this.destroyLobbyAmbience();
       this.resetCountdown();
+      this.destroyTimeLeftText();
     });
 
     this.scoreboard?.destroy();
@@ -873,6 +878,26 @@ export class GameScene extends Phaser.Scene {
     this.scoreboard = undefined;
   }
 
+  /** Called on every room state patch: the header's time left in a timed round, right-aligned beside the header button. Null hides it. */
+  setTimeLeft(timeLeft: HudTimeLeft | null) {
+    if (timeLeft === null) {
+      this.destroyTimeLeftText();
+      return;
+    }
+    if (!this.timeLeftText) {
+      const { x } = headerButtonPosition(this.scale.width);
+      this.timeLeftText = this.add.text(x - TIME_LEFT_GAP, HEADER.height / 2, '', {
+        fontFamily: FONT_FAMILY, fontSize: '28px', stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10);
+    }
+    this.timeLeftText.setText(timeLeft.label).setColor(timeLeft.urgent ? '#ff4444' : '#ffffff');
+  }
+
+  private destroyTimeLeftText() {
+    this.timeLeftText?.destroy();
+    this.timeLeftText = undefined;
+  }
+
   // Update the header ping readout and signal meter; undefined means no ping yet.
   setPing(pingMs: number | undefined) {
     this.pingText.setText(formatPingReadout(pingMs));
@@ -1000,6 +1025,7 @@ export class GameScene extends Phaser.Scene {
     this.resetCountdown();
     this.pingBars?.destroy();
     this.pingBars = undefined;
+    this.destroyTimeLeftText();
     this.headerButton?.destroy();
     this.headerButton = undefined;
     this.destroyLobbyPanel();

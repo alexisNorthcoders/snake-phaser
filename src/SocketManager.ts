@@ -3,6 +3,7 @@ import { Snake } from "./Snake";
 import { GameScene } from "./scenes/GameScene";
 import { Food } from "./Food";
 import { GameState, tailCells } from "./schemas/Food";
+import { hudTimeLeft } from "./timeLeft";
 import { roomEntry } from "./matchmaking";
 import { feature } from "./feature";
 import { scoreboardRows } from "./utils/scoreboardLayout";
@@ -139,6 +140,7 @@ class SocketManager {
         this.updateScoreboard(scene, state);
 
         scene.onPhaseState?.(state.phase, state.countdown);
+        scene.setTimeLeft?.(hudTimeLeft(state.phase, state.mode, state.ticksLeft, state.tickMs));
 
         state.players.forEach((player) => {
           if (player.snake) {
