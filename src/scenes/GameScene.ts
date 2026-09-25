@@ -1,7 +1,8 @@
 import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
 import { deathText, roundHeadline, type DeathCause, type RoundEndReason } from '../roundSummary';
 import socketManager from '../SocketManager';
-import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore } from '../Snake';
+import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore, postUserScore } from '../Snake';
+import { saveRoundScore } from '../roundScore';
 import { Food } from '../Food';
 import { FOOD_TYPES, foodTexturePath } from '../foodTextures';
 import { BACKGROUND_TEXTURE, backgroundTexturePath } from '../backgroundTexture';
@@ -756,27 +757,17 @@ export class GameScene extends Phaser.Scene {
     this.isGameOver = false;
   }
 
-  async onGameOver(payload: GameOverPayload) {
+  onGameOver(payload: GameOverPayload) {
     console.log("[GameScene] Game over callback", payload);
     this.isGameOver = true;
     this.clearGameOverOverlay();
 
-    // Save the player's score to local storage
-    const sessionId = socketManager.getRoom()?.sessionId;
-    const playerRanking = payload.rankings.find(r => r.id === sessionId);
-    if (playerRanking) {
-      LocalScoresManager.saveScore(playerRanking.score);
-
-      // For anonymous players, also try to submit score to server
-      if (this.guest) {
-        const clientId = ClientIdManager.getOrCreateClientId();
-        const result = await postAnonymousScore(clientId, playerRanking.score);
-        if (!result.success) {
-          console.warn('[GameScene] Failed to submit score to server:', result.message);
-          // Score is saved locally, continue gracefully
-        }
-      }
-    }
+    // Saved alongside, not before, the end screen: a slow or failed post never holds it up.
+    void saveRoundScore(payload, socketManager.getRoom()?.sessionId, this.guest, {
+      postUserScore,
+      postAnonymousScore: (score) => postAnonymousScore(ClientIdManager.getOrCreateClientId(), score),
+      saveLocalScore: (score) => LocalScoresManager.saveScore(score),
+    });
 
     this.displayGameOverScreen(payload);
   }

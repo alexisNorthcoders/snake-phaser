@@ -147,15 +147,13 @@ export class Snake {
         this.bodyMask.destroy()
     }
 
-    async stop(playerId: string, score: number, isAnonymous: boolean): Promise<void> {
+    stop(): void {
         this.isDead = true
         this.snap()
-
-        await postUserScore(score)
     }
 }
 
-async function postUserScore(score: number): Promise<void> {
+export async function postUserScore(score: number): Promise<void> {
 
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
 
