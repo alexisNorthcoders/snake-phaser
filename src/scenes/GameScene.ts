@@ -92,6 +92,8 @@ export class GameScene extends Phaser.Scene {
   /** True once the socket has been connected with a session; false while a first-time guest is still only browsing the lobby. */
   private sessionConnected = false;
   private startInFlight = false;
+  /** True once a connected lobby has sent startGame; the lobby is left for the countdown, so a mode switch must not restart it. */
+  private startSent = false;
   private startError?: Phaser.GameObjects.Text;
   private colourSelection?: ColourSelection;
   private accountAppearance?: AccountAppearanceStore;
@@ -163,7 +165,7 @@ export class GameScene extends Phaser.Scene {
     this.modeLabel = this.add.text(left, rowY + MODE_ROW.buttonHeight / 2, 'Mode', {
       fontFamily: FONT_FAMILY, fontSize: '24px', color: '#ffffff',
     }).setOrigin(0, 0.5);
-    let x = left + this.modeLabel.width + 16;
+    let x = left + this.modeLabel.width + MODE_ROW.labelGap;
     for (const mode of GAME_MODES) {
       this.modeButtons.set(mode, new PixelButton(this, {
         x,
@@ -173,7 +175,7 @@ export class GameScene extends Phaser.Scene {
         label: MODE_LABELS[mode],
         onClick: () => this.onModeClicked(mode),
       }));
-      x += MODE_ROW.buttonWidth + 12;
+      x += MODE_ROW.buttonWidth + MODE_ROW.buttonGap;
     }
     this.modeBlurb = this.add.text(left, rowY + MODE_ROW.buttonHeight + MODE_ROW.blurbGap + MODE_ROW.blurbHeight / 2, '', {
       fontFamily: FONT_FAMILY, fontSize: '18px', color: '#cccccc',
@@ -200,7 +202,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Rooms are created and matched by mode, so a lobby already in a room leaves it and matches again in the new mode. */
   private onModeClicked(mode: GameMode): void {
-    if (this.startInFlight || this.gameStarted || mode === this.mode) return;
+    if (this.startInFlight || this.startSent || this.gameStarted || mode === this.mode) return;
     this.mode = mode;
     modeStore.save(mode);
     this.refreshModeRow();
@@ -257,6 +259,7 @@ export class GameScene extends Phaser.Scene {
     if (this.startInFlight) return;
     if (this.sessionConnected) {
       this.commitName();
+      this.startSent = true;
       socketManager.send({ event: 'startGame' });
       return;
     }
@@ -537,6 +540,7 @@ export class GameScene extends Phaser.Scene {
     const userData: StoredUser = session ?? {};
     this.sessionConnected = session !== undefined;
     this.startInFlight = false;
+    this.startSent = false;
 
     this.guest = session ? isGuest(userData) : true;
     // Guests play under the name they picked last time; logged-in players keep their account username.

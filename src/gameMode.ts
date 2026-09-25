@@ -7,6 +7,8 @@ export type GameMode = 'timed' | 'endless';
 
 export const GAME_MODES: readonly GameMode[] = ['timed', 'endless'];
 
+export const DEFAULT_MODE: GameMode = 'timed';
+
 /** Mirrors the server's round length (`roundSeconds: 180`). */
 export const TIMED_ROUND_MINUTES = 3;
 
@@ -19,7 +21,7 @@ export const MODE_BLURBS: Record<GameMode, string> = {
 
 /** `value` as a mode, or `timed` when it isn't one, the same fallback as the server. */
 export function modeOf(value: unknown): GameMode {
-  return GAME_MODES.includes(value as GameMode) ? (value as GameMode) : 'timed';
+  return GAME_MODES.includes(value as GameMode) ? (value as GameMode) : DEFAULT_MODE;
 }
 
 export interface ModeStore {
@@ -34,7 +36,7 @@ export function createModeStore(storage: ModeStorage | undefined): ModeStore {
       try {
         return modeOf(storage?.getItem(STORAGE_KEY));
       } catch {
-        return modeOf(undefined);
+        return DEFAULT_MODE;
       }
     },
     save(mode) {

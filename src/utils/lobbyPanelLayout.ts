@@ -6,7 +6,7 @@ export const TITLE_HEIGHT = 40;
 export const DIVIDER_HEIGHT = 4;
 export const NAME_ROW_HEIGHT = 44;
 /** The Mode row: the Timed / Endless toggle buttons over a one-line blurb of the chosen mode. */
-export const MODE_ROW = { buttonWidth: 140, buttonHeight: 36, blurbGap: 6, blurbHeight: 22 } as const;
+export const MODE_ROW = { labelGap: 16, buttonGap: 12, buttonWidth: 140, buttonHeight: 36, blurbGap: 6, blurbHeight: 22 } as const;
 export const MODE_ROW_HEIGHT = MODE_ROW.buttonHeight + MODE_ROW.blurbGap + MODE_ROW.blurbHeight;
 export const START_BUTTON = { width: 200, height: 56 } as const;
 /** Height of the colour row: the preview box, which the buttons and swatches match. */

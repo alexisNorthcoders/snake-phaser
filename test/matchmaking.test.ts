@@ -16,8 +16,8 @@ test('a vs-bot match sends the bot reaction ticks; a public join never does', ()
 });
 
 test('both room-entry paths send the requested speed', () => {
-  assert.deepEqual(roomEntry(false, 2, 12, 'timed').options.speed, 12);
-  assert.deepEqual(roomEntry(true, 2, 12, 'timed').options.speed, 12);
+  assert.equal(roomEntry(false, 2, 12, 'timed').options.speed, 12);
+  assert.equal(roomEntry(true, 2, 12, 'timed').options.speed, 12);
 });
 
 test('both room-entry paths carry the chosen mode', () => {
