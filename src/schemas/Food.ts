@@ -1,6 +1,7 @@
 import { Schema, type, ArraySchema } from "@colyseus/schema";
 import { FoodType } from "../Food";
 import type { Phase } from "../countdownOverlay";
+import type { GameMode } from "../gameMode";
 
 export class Food extends Schema {
     @type("number") x: number = 0;
@@ -59,6 +60,8 @@ export class Player extends Schema {
 export class GameState extends Schema {
     @type("string") phase: Phase = "lobby";
     @type("number") countdown: number = 0;
+    /** The kind of round the room plays, fixed at room creation from the `mode` room option. */
+    @type("string") mode: GameMode = "timed";
     /** Length of one simulation tick in ms, fixed at room creation, so clients can pace their animation. */
     @type("number") tickMs: number = 125;
     @type("number") aliveCount: number = 0;
