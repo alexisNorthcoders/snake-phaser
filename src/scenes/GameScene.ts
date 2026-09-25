@@ -17,6 +17,7 @@ import { createFpsMeter, formatFpsReadout } from '../fpsMeter';
 import { createAccountAppearanceStore, createAppearanceStore, type AccountAppearanceStore } from '../appearanceStore';
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
+import { createModeStore, GAME_MODES, MODE_BLURBS, MODE_LABELS, type GameMode } from '../gameMode';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
 import { PixelButton } from '../PixelButton';
@@ -25,7 +26,7 @@ import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
-import { LOBBY_PANEL, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
+import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
 interface SnakeColors {
   head: string;
@@ -46,6 +47,7 @@ interface GameOverPayload {
 
 const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
+const modeStore = createModeStore(localStorageOrNothing());
 
 export class GameScene extends Phaser.Scene {
   public startTime: number = 0;
@@ -62,6 +64,11 @@ export class GameScene extends Phaser.Scene {
   /** True while playing a private match against the server bot; survives scene restarts so Play Again stays vs-bot. */
   public vsBot: boolean = false;
   private vsBotButton?: PixelButton;
+  /** The mode rooms are created and matched in; remembered on this device and kept across scene restarts. */
+  public mode: GameMode = modeStore.load();
+  private modeLabel?: Phaser.GameObjects.Text;
+  private modeButtons = new Map<GameMode, PixelButton>();
+  private modeBlurb?: Phaser.GameObjects.Text;
   public playerId: string = '';
   public gameConfigured: boolean = false
   public snakes: Map<string, Snake> = new Map();
@@ -150,7 +157,60 @@ export class GameScene extends Phaser.Scene {
     this.nameField.on('textchange', () => this.applyNameField());
   }
 
-  /** The framed lobby panel: title, divider and Start button; the Name row is added for guests. */
+  /** The Mode row: Timed / Endless toggle buttons, with a few words on the chosen mode below them. */
+  private createModeRow(rowY: number): void {
+    const left = LOBBY_PANEL.x + LOBBY_PANEL.padding;
+    this.modeLabel = this.add.text(left, rowY + MODE_ROW.buttonHeight / 2, 'Mode', {
+      fontFamily: FONT_FAMILY, fontSize: '24px', color: '#ffffff',
+    }).setOrigin(0, 0.5);
+    let x = left + this.modeLabel.width + 16;
+    for (const mode of GAME_MODES) {
+      this.modeButtons.set(mode, new PixelButton(this, {
+        x,
+        y: rowY,
+        width: MODE_ROW.buttonWidth,
+        height: MODE_ROW.buttonHeight,
+        label: MODE_LABELS[mode],
+        onClick: () => this.onModeClicked(mode),
+      }));
+      x += MODE_ROW.buttonWidth + 12;
+    }
+    this.modeBlurb = this.add.text(left, rowY + MODE_ROW.buttonHeight + MODE_ROW.blurbGap + MODE_ROW.blurbHeight / 2, '', {
+      fontFamily: FONT_FAMILY, fontSize: '18px', color: '#cccccc',
+    }).setOrigin(0, 0.5);
+    this.refreshModeRow();
+  }
+
+  private refreshModeRow(): void {
+    this.modeButtons.forEach((button, mode) => {
+      const selected = mode === this.mode;
+      button.setFill(selected ? 'button-alt' : 'field').setPressed(selected);
+    });
+    this.modeBlurb?.setText(MODE_BLURBS[this.mode]);
+  }
+
+  private destroyModeRow(): void {
+    this.modeLabel?.destroy();
+    this.modeLabel = undefined;
+    this.modeButtons.forEach((button) => button.destroy());
+    this.modeButtons.clear();
+    this.modeBlurb?.destroy();
+    this.modeBlurb = undefined;
+  }
+
+  /** Rooms are created and matched by mode, so a lobby already in a room leaves it and matches again in the new mode. */
+  private onModeClicked(mode: GameMode): void {
+    if (this.startInFlight || this.gameStarted || mode === this.mode) return;
+    this.mode = mode;
+    modeStore.save(mode);
+    this.refreshModeRow();
+    if (!this.sessionConnected) return;
+    this.commitName();
+    socketManager.close();
+    this.scene.restart();
+  }
+
+  /** The framed lobby panel: title, divider, Mode row and Start button; the Name row is added for guests. */
   private createLobbyPanel(): void {
     this.destroyLobbyPanel();
     const p = LOBBY_PANEL;
@@ -161,6 +221,7 @@ export class GameScene extends Phaser.Scene {
       fontFamily: FONT_FAMILY, fontSize: '32px', color: '#ffffff',
     }).setOrigin(0.5).setShadow(4, 4, '#008000', 0, false, true);
     if (layout.nameRowY !== undefined) this.createNameField(layout.nameRowY);
+    this.createModeRow(layout.modeRowY);
     this.startButton = new PixelButton(this, {
       x: p.x + (p.width - START_BUTTON.width) / 2,
       y: layout.startY,
@@ -284,6 +345,7 @@ export class GameScene extends Phaser.Scene {
     this.startError?.destroy();
     this.startError = undefined;
     this.destroyNameField();
+    this.destroyModeRow();
   }
 
   // Sync this.name and the visible name texts from the field's current value.

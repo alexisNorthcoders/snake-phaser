@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeDividerRects, computeFrameRects } from '../src/utils/framedPanelStyle.ts';
-import { computeLobbyPanelLayout, LOBBY_PANEL } from '../src/utils/lobbyPanelLayout.ts';
+import { computeLobbyPanelLayout, LOBBY_PANEL, MODE_ROW_HEIGHT } from '../src/utils/lobbyPanelLayout.ts';
 
 test('frame: shadow, outline, scrim with given alpha, four 4px #333333 border strips', () => {
   const r = computeFrameRects(560, 480, 0.9);
@@ -19,17 +19,21 @@ test('divider: 4px tall, alternating 4px dashes and 4px gaps', () => {
   assert.equal(r[1].x, 8);
 });
 
-test('lobby layout: guest stack is centred with 24px gaps', () => {
+test('lobby layout: guest stack is centred, with gaps tightened to fit the Name and Mode rows', () => {
   const l = computeLobbyPanelLayout(true);
-  assert.equal(l.dividerY - (l.titleY + 40), 24);
-  assert.equal(l.nameRowY! - (l.dividerY + 4), 24);
-  assert.equal(l.colourSpaceY - (l.nameRowY! + 44), 24);
+  const gap = l.dividerY - (l.titleY + 40);
+  assert.ok(gap >= 12 && gap <= 24);
+  assert.equal(l.nameRowY! - (l.dividerY + 4), gap);
+  assert.equal(l.modeRowY - (l.nameRowY! + 44), gap);
+  assert.equal(l.colourSpaceY - (l.modeRowY + MODE_ROW_HEIGHT), gap);
+  assert.equal(l.startY - (l.colourSpaceY + 124), gap);
   const bottom = l.startY + 56;
-  assert.equal(l.titleY - (LOBBY_PANEL.y + 32), LOBBY_PANEL.y + LOBBY_PANEL.height - 32 - bottom);
+  assert.ok(Math.abs((l.titleY - (LOBBY_PANEL.y + 32)) - (LOBBY_PANEL.y + LOBBY_PANEL.height - 32 - bottom)) <= 1);
 });
 
-test('lobby layout: accounts have no Name row', () => {
+test('lobby layout: accounts have no Name row, keep 24px gaps and still get the Mode row', () => {
   const l = computeLobbyPanelLayout(false);
   assert.equal(l.nameRowY, undefined);
-  assert.equal(l.colourSpaceY - (l.dividerY + 4), 24);
+  assert.equal(l.modeRowY - (l.dividerY + 4), 24);
+  assert.equal(l.colourSpaceY - (l.modeRowY + MODE_ROW_HEIGHT), 24);
 });
