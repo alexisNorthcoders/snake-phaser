@@ -185,18 +185,17 @@ test('list() shows assetTheme with its allowed values', () => {
   assert.match(out.lines.join('\n'), /feature\.assetTheme = 'goblin-treasure'.*'classic' \| 'goblin-treasure'/);
 });
 
-test('vsBot is off by default, survives a reload, and a non-boolean warns and resets to off', () => {
+test('a stale stored vsBot is ignored without a warning and dropped on the next save', () => {
   const storage = new MemoryStorage();
+  storage.setItem('feature', JSON.stringify({ vsBot: 'yes', gameSpeed: 10 }));
   const out = quietLog();
   const feature = createFeatureSettings(storage, out);
-  assert.equal(feature.vsBot, false);
+  assert.equal('vsBot' in feature, false);
+  assert.equal(feature.gameSpeed, 10);
+  assert.deepEqual(out.lines, []);
 
-  feature.vsBot = true;
-  assert.equal(createFeatureSettings(storage, quietLog()).vsBot, true);
-
-  feature.vsBot = 'yes' as never;
-  assert.equal(feature.vsBot, false);
-  assert.match(out.lines.join('\n'), /vsBot/);
+  feature.gameSpeed = 9;
+  assert.equal('vsBot' in JSON.parse(storage.getItem('feature')!), false);
 });
 
 test('botReactionTicks defaults to 2, persists, clamps to 0–4 with a warning, and rejects non-integers', () => {

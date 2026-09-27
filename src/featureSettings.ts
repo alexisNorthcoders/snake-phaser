@@ -15,8 +15,6 @@ export interface FeatureSettings {
     assetTheme: AssetTheme
     /** How far the background is dimmed behind the board, 0 (untouched) to 1 (black). */
     backgroundDim: number
-    /** Shows the "Play vs Computer" entry point in the lobby. Off until the vs-bot mode ships. */
-    vsBot: boolean
     /** How many ticks the bot waits before reacting, an integer 0–4. One tick is one move, 125 ms. Sent when a vs-bot room is created. */
     botReactionTicks: number
     /** Ticks per second the room simulates at, an integer 4–15. Sent as `speed` when entering a room. */
@@ -41,9 +39,9 @@ const MAX_REACTION_TICKS = 4
 const MIN_GAME_SPEED = 4
 const MAX_GAME_SPEED = 15
 
-type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'vsBot' | 'botReactionTicks' | 'gameSpeed'>
+type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'botReactionTicks' | 'gameSpeed'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, vsBot: false, botReactionTicks: 2, gameSpeed: 8 }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, botReactionTicks: 2, gameSpeed: 8 }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -99,12 +97,6 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         return clamped
     }
 
-    const vsBotFlag = (value: unknown): boolean => {
-        if (typeof value === 'boolean') return value
-        warn(`vsBot must be a boolean, got ${JSON.stringify(value)}; using ${DEFAULTS.vsBot}`)
-        return DEFAULTS.vsBot
-    }
-
     const botReactionTicks = (value: unknown): number => {
         if (typeof value !== 'number' || !Number.isInteger(value)) {
             warn(`botReactionTicks must be an integer, got ${JSON.stringify(value)}; using ${DEFAULTS.botReactionTicks}`)
@@ -134,7 +126,6 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
         lobbyAmbience: 'lobbyAmbience' in stored ? ambienceFlag(stored.lobbyAmbience) : DEFAULTS.lobbyAmbience,
         assetTheme: 'assetTheme' in stored ? assetTheme(stored.assetTheme) : DEFAULTS.assetTheme,
         backgroundDim: 'backgroundDim' in stored ? backgroundDim(stored.backgroundDim) : DEFAULTS.backgroundDim,
-        vsBot: 'vsBot' in stored ? vsBotFlag(stored.vsBot) : DEFAULTS.vsBot,
         botReactionTicks: 'botReactionTicks' in stored ? botReactionTicks(stored.botReactionTicks) : DEFAULTS.botReactionTicks,
         gameSpeed: 'gameSpeed' in stored ? gameSpeed(stored.gameSpeed) : DEFAULTS.gameSpeed,
     }
@@ -191,11 +182,6 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
             values.backgroundDim = backgroundDim(dim)
             save()
         },
-        get vsBot() { return values.vsBot },
-        set vsBot(show) {
-            values.vsBot = vsBotFlag(show)
-            save()
-        },
         get botReactionTicks() { return values.botReactionTicks },
         set botReactionTicks(ticks) {
             values.botReactionTicks = botReactionTicks(ticks)
@@ -216,7 +202,6 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.lobbyAmbience = ${values.lobbyAmbience}    // true | false, decorative snake around the lobby edge`,
                 `  feature.assetTheme = '${values.assetTheme}'    // ${ASSET_THEMES.map((theme) => `'${theme}'`).join(' | ')}, folder food textures load from (reload to apply)`,
                 `  feature.backgroundDim = ${values.backgroundDim}    // ${MIN_DIM}–${MAX_DIM}, dims the background behind the board (applies immediately)`,
-                `  feature.vsBot = ${values.vsBot}    // true | false, shows "Play vs Computer" in the lobby (reload to apply)`,
                 `  feature.botReactionTicks = ${values.botReactionTicks}    // ${MIN_REACTION_TICKS}–${MAX_REACTION_TICKS} ticks (1 tick = 125 ms), bot reaction time, used by the next "Play vs Computer"`,
                 `  feature.gameSpeed = ${values.gameSpeed}    // ${MIN_GAME_SPEED}–${MAX_GAME_SPEED} ticks per second, sent as 'speed' when entering the next room`,
             ].join('\n'))

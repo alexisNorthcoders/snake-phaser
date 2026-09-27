@@ -260,9 +260,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.vsBot) this.createVsBotButton();
   }
 
-  /** Dev-only entry point below the lobby panel, hidden unless `feature.vsBot` is on. */
+  /** "Play vs Computer" entry point below the lobby panel. */
   private createVsBotButton(): void {
-    if (!feature.vsBot || this.vsBotButton) return;
+    if (this.vsBotButton) return;
     const p = LOBBY_PANEL;
     const width = 260;
     this.vsBotButton = new PixelButton(this, {
@@ -1063,8 +1063,7 @@ export class GameScene extends Phaser.Scene {
 
   init(data?: { vsBot?: boolean }) {
     // The scene instance survives restarts, so a restart without data keeps the current mode instead of dropping to the public lobby.
-    if (data?.vsBot !== undefined) this.vsBot = feature.vsBot && data.vsBot;
-    else this.vsBot = feature.vsBot && this.vsBot;
+    if (data?.vsBot !== undefined) this.vsBot = data.vsBot;
     // Initialize properties here
     this.snakes = new Map();
     this.food = [];
