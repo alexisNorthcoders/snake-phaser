@@ -20,6 +20,8 @@ import { createAccountAppearanceStore, createAppearanceStore, type AccountAppear
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
 import { createModeStore, GAME_MODES, MODE_BLURBS, MODE_LABELS, modeOf, type GameMode } from '../gameMode';
+import { createBotChoiceStore, loadRoster, type RosterEntry } from '../roster';
+import { RosterPicker } from '../RosterPicker';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
 import { PixelButton } from '../PixelButton';
@@ -55,6 +57,7 @@ interface GameOverPayload {
 const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
 const modeStore = createModeStore(localStorageOrNothing());
+const botChoiceStore = createBotChoiceStore(localStorageOrNothing());
 /** Space between the header timer or hunger bar and the header button on its right. */
 const HEADER_ITEM_GAP = 16;
 /**
@@ -81,6 +84,9 @@ export class GameScene extends Phaser.Scene {
   /** True while playing a private match against the server bot; survives scene restarts so Play Again stays vs-bot. */
   public vsBot: boolean = false;
   private vsBotButton?: PixelButton;
+  /** The roster snake a vs-bot room is created against; remembered on this device and kept across scene restarts. */
+  public botId: string = botChoiceStore.load();
+  private rosterPicker?: RosterPicker;
   /** The mode rooms are created and matched in; remembered on this device and kept across scene restarts. */
   public mode: GameMode = modeStore.load();
   private modeLabel?: Phaser.GameObjects.Text;
@@ -272,8 +278,33 @@ export class GameScene extends Phaser.Scene {
       height: 34,
       label: 'Play vs Computer',
       fontSize: 18,
-      onClick: () => this.onVsBotClicked(),
+      onClick: () => this.openRosterPicker(),
     });
+  }
+
+  /** "Play vs Computer" opens the roster picker; the Name row's DOM input would paint over it, so it's hidden meanwhile. */
+  private openRosterPicker(): void {
+    if (this.startInFlight || this.vsBot || this.rosterPicker) return;
+    this.setNameRowVisible(false);
+    this.rosterPicker = new RosterPicker(this, {
+      roster: loadRoster(),
+      chosenId: this.botId,
+      onChoose: (entry) => this.onBotChosen(entry),
+      onClose: () => this.closeRosterPicker(),
+    });
+  }
+
+  private closeRosterPicker(): void {
+    this.rosterPicker?.destroy();
+    this.rosterPicker = undefined;
+    this.setNameRowVisible(true);
+  }
+
+  private onBotChosen(entry: RosterEntry): void {
+    this.closeRosterPicker();
+    this.botId = entry.id;
+    botChoiceStore.save(entry.id);
+    this.enterVsBotRoom();
   }
 
   private onStartClicked(): void {
@@ -288,8 +319,8 @@ export class GameScene extends Phaser.Scene {
     void this.startAsNewGuest(true);
   }
 
-  /** "Play vs Computer": leave any public room and create a fresh vs-bot one, staying in the lobby to press Start. */
-  private onVsBotClicked(): void {
+  /** A snake was picked: leave any public room and create a fresh vs-bot one against it, staying in the lobby to press Start. */
+  private enterVsBotRoom(): void {
     if (this.startInFlight || this.vsBot) return;
     this.vsBot = true;
     this.vsBotButton?.destroy();
@@ -367,6 +398,8 @@ export class GameScene extends Phaser.Scene {
     this.startButton = undefined;
     this.vsBotButton?.destroy();
     this.vsBotButton = undefined;
+    this.rosterPicker?.destroy();
+    this.rosterPicker = undefined;
     this.startError?.destroy();
     this.startError = undefined;
     this.destroyNameField();
