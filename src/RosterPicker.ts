@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { FONT_FAMILY } from './font';
 import { FramedPanel } from './FramedPanel';
 import { PixelButton } from './PixelButton';
-import { methodLabel, personalityLabel, ROOKIE, type RosterEntry } from './roster';
+import type { GameMode } from './gameMode';
+import { methodLabel, personalityLabel, recordLines, ROOKIE, type BotRecords, type RosterEntry } from './roster';
 import { ROSTER_CARD, ROSTER_PICKER, computeRosterPickerLayout, type RosterPickerLayout } from './utils/rosterPickerLayout';
 
 /** Above the lobby, its panels and the header, so nothing under the picker shows through or takes a click. */
@@ -15,6 +16,10 @@ const BASELINE_COLOR = '#ffff00';
 export interface RosterPickerOptions {
   /** Resolves to the snakes to show; the picker says it's loading until then. */
   roster: Promise<RosterEntry[]>;
+  /** Resolves to each snake's record against humans; cards show none until it does, or if it never loads. */
+  records: Promise<BotRecords>;
+  /** The mode the player has chosen, whose record is shown first. */
+  mode: GameMode;
   /** The id chosen last time, whose card is highlighted. */
   chosenId: string;
   onChoose: (entry: RosterEntry) => void;
@@ -60,6 +65,8 @@ export class RosterPicker {
       const layout = computeRosterPickerLayout(entries.length);
       this.drawFrame(layout);
       this.drawCards(entries, layout);
+      // Independent of the roster: the cards are already up, and a failed load leaves the record lines empty.
+      options.records.then((records) => this.drawRecords(entries, layout, records), () => {});
     });
   }
 
@@ -103,7 +110,17 @@ export class RosterPicker {
         this.text(left, lineY(line++), personalityLabel(entry.personality), 16, DETAIL_COLOR).setOrigin(0, 0.5);
       }
       this.text(left, lineY(line), `Gen ${entry.generation} · ${methodLabel(entry.method)}`, 16, DETAIL_COLOR).setOrigin(0, 0.5);
-      // Line `ROSTER_CARD.recordLine` is left free for the snake's record against humans.
+    });
+  }
+
+  /** Each card's record against humans on line `ROSTER_CARD.recordLine`, a mode per row, chosen mode first. */
+  private drawRecords(entries: RosterEntry[], l: RosterPickerLayout, records: BotRecords): void {
+    if (this.destroyed) return;
+    entries.forEach((entry, i) => {
+      const { x, y } = l.cards[i];
+      const lines = recordLines(records, entry.id, this.options.mode);
+      const centerY = y + ROSTER_CARD.padding + ROSTER_CARD.lineHeight * ROSTER_CARD.recordLine + ROSTER_CARD.lineHeight / 2;
+      this.text(x + ROSTER_CARD.padding, centerY, lines.join('\n'), 13, DETAIL_COLOR).setOrigin(0, 0.5);
     });
   }
 

@@ -20,7 +20,7 @@ import { createAccountAppearanceStore, createAppearanceStore, type AccountAppear
 import InputText from 'phaser3-rex-plugins/plugins/inputtext';
 import { createNameStore, MAX_NAME_LENGTH, normaliseName } from '../nameStore';
 import { createModeStore, GAME_MODES, MODE_BLURBS, MODE_LABELS, modeOf, type GameMode } from '../gameMode';
-import { createBotChoiceStore, loadRoster, type RosterEntry } from '../roster';
+import { createBotChoiceStore, loadBotRecords, loadRoster, type RosterEntry } from '../roster';
 import { RosterPicker } from '../RosterPicker';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
@@ -288,6 +288,8 @@ export class GameScene extends Phaser.Scene {
     this.setNameRowVisible(false);
     this.rosterPicker = new RosterPicker(this, {
       roster: loadRoster(),
+      records: loadBotRecords(),
+      mode: this.mode,
       chosenId: this.botId,
       onChoose: (entry) => this.onBotChosen(entry),
       onClose: () => this.closeRosterPicker(),
