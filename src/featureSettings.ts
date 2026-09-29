@@ -15,7 +15,7 @@ export interface FeatureSettings {
     assetTheme: AssetTheme
     /** How far the background is dimmed behind the board, 0 (untouched) to 1 (black). */
     backgroundDim: number
-    /** How many ticks the bot waits before reacting, an integer 0–4. One tick is one move, 125 ms. Sent when a vs-bot room is created. */
+    /** How many ticks the bot waits before reacting, an integer 0–4. One tick is one move (1000 ÷ gameSpeed ms). Sent when a vs-bot room is created. */
     botReactionTicks: number
     /** Ticks per second the room simulates at, an integer 4–15. Sent as `speed` when entering a room. */
     gameSpeed: number
@@ -41,7 +41,7 @@ const MAX_GAME_SPEED = 15
 
 type Values = Pick<FeatureSettings, 'snakeBody' | 'snakeBodyWidth' | 'snakeHeadFollowsArc' | 'showFps' | 'lobbyAmbience' | 'assetTheme' | 'backgroundDim' | 'botReactionTicks' | 'gameSpeed'>
 
-const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, botReactionTicks: 2, gameSpeed: 8 }
+const DEFAULTS: Values = { snakeBody: 'blocks', snakeBodyWidth: 0.8, snakeHeadFollowsArc: true, showFps: false, lobbyAmbience: true, assetTheme: 'goblin-treasure', backgroundDim: 0.4, botReactionTicks: 2, gameSpeed: 6 }
 
 export function createFeatureSettings(storage: SettingsStorage | undefined, logger: Logger): FeatureSettings {
     const log = (message: string) => logger.log(`[feature] ${message}`)
@@ -202,7 +202,7 @@ export function createFeatureSettings(storage: SettingsStorage | undefined, logg
                 `  feature.lobbyAmbience = ${values.lobbyAmbience}    // true | false, decorative snake around the lobby edge`,
                 `  feature.assetTheme = '${values.assetTheme}'    // ${ASSET_THEMES.map((theme) => `'${theme}'`).join(' | ')}, folder food textures load from (reload to apply)`,
                 `  feature.backgroundDim = ${values.backgroundDim}    // ${MIN_DIM}–${MAX_DIM}, dims the background behind the board (applies immediately)`,
-                `  feature.botReactionTicks = ${values.botReactionTicks}    // ${MIN_REACTION_TICKS}–${MAX_REACTION_TICKS} ticks (1 tick = 125 ms), bot reaction time, used by the next "Play vs Computer"`,
+                `  feature.botReactionTicks = ${values.botReactionTicks}    // ${MIN_REACTION_TICKS}–${MAX_REACTION_TICKS} ticks (1 tick = one move), bot reaction time, used by the next "Play vs Computer"`,
                 `  feature.gameSpeed = ${values.gameSpeed}    // ${MIN_GAME_SPEED}–${MAX_GAME_SPEED} ticks per second, sent as 'speed' when entering the next room`,
             ].join('\n'))
         },
