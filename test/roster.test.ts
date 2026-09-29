@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createBotChoiceStore, loadRoster, methodLabel, personalityLabel, ROOKIE, type RosterFetch } from '../src/roster.ts';
+import { createBotChoiceStore, loadBotRecords, loadRoster, recordLines, methodLabel, personalityLabel, ROOKIE, type RosterFetch } from '../src/roster.ts';
 
 class MemoryStorage {
   items = new Map<string, string>();
@@ -111,4 +111,70 @@ test('the choice works without storage, or with storage that throws', () => {
     assert.equal(store.load(), 'rookie');
     assert.doesNotThrow(() => store.save('dummy'));
   }
+});
+
+test('records are fetched same-origin from the go-server api', async () => {
+  const urls: string[] = [];
+  await loadBotRecords(async (url) => {
+    urls.push(String(url));
+    return json(200, {});
+  });
+  assert.deepEqual(urls, ['/api/bot-records']);
+});
+
+test('a good records response gives each bot\'s record per mode', async () => {
+  const records = await loadBotRecords(async () => json(200, {
+    rookie: { timed: { wins: 5, losses: 2, draws: 1 }, endless: { wins: 0, losses: 1, draws: 0 } },
+    dummy: { endless: { wins: 1, losses: 0, draws: 0 } },
+  }));
+  assert.deepEqual(records.get('rookie'), {
+    timed: { wins: 5, losses: 2, draws: 1 },
+    endless: { wins: 0, losses: 1, draws: 0 },
+  });
+  assert.deepEqual(records.get('dummy'), { endless: { wins: 1, losses: 0, draws: 0 } });
+});
+
+test('failed or malformed records give nothing', async () => {
+  const failures: RosterFetch[] = [
+    async () => { throw new TypeError('Failed to fetch'); },
+    async () => json(500, { rookie: { timed: { wins: 1, losses: 0, draws: 0 } } }),
+    async () => new Response('<html>oops</html>', { status: 200 }),
+    async () => json(200, null),
+    async () => json(200, []),
+    async () => json(200, 'rookie'),
+  ];
+  for (const failing of failures) {
+    assert.equal((await loadBotRecords(failing)).size, 0);
+  }
+});
+
+test('record entries that cannot be read are ignored and the rest are kept', async () => {
+  const records = await loadBotRecords(async () => json(200, {
+    rookie: { timed: { wins: 1, losses: 2, draws: 3 }, endless: { wins: -1, losses: 0, draws: 0 }, zen: { wins: 1, losses: 1, draws: 1 } },
+    broken: 'x',
+    partial: { timed: { wins: 1, losses: 2 } },
+    fractional: { timed: { wins: 1.5, losses: 0, draws: 0 } },
+    nothing: null,
+  }));
+  assert.deepEqual([...records.keys()], ['rookie']);
+  assert.deepEqual(records.get('rookie'), { timed: { wins: 1, losses: 2, draws: 3 } });
+});
+
+test('a snake with results in both modes shows the chosen mode first', async () => {
+  const records = await loadBotRecords(async () => json(200, {
+    rookie: { timed: { wins: 5, losses: 2, draws: 1 }, endless: { wins: 0, losses: 1, draws: 0 } },
+  }));
+  assert.deepEqual(recordLines(records, 'rookie', 'timed'), ['Timed 5W 2L 1D', 'Endless 0W 1L 0D']);
+  assert.deepEqual(recordLines(records, 'rookie', 'endless'), ['Endless 0W 1L 0D', 'Timed 5W 2L 1D']);
+});
+
+test('a snake with results in one mode leaves the other out', async () => {
+  const records = await loadBotRecords(async () => json(200, { dummy: { endless: { wins: 1, losses: 0, draws: 0 } } }));
+  assert.deepEqual(recordLines(records, 'dummy', 'timed'), ['Endless 1W 0L 0D']);
+});
+
+test('a snake with no results says so, and unloaded records show nothing', async () => {
+  const records = await loadBotRecords(async () => json(200, {}));
+  assert.deepEqual(recordLines(records, 'rookie', 'timed'), ['No games yet']);
+  assert.deepEqual(recordLines(undefined, 'rookie', 'timed'), []);
 });

@@ -1,3 +1,5 @@
+import { GAME_MODES, MODE_LABELS, type GameMode } from './gameMode.ts';
+
 type BotChoiceStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 export type RosterFetch = (input: string) => Promise<Response>;
@@ -100,4 +102,66 @@ export function createBotChoiceStore(storage: BotChoiceStorage | undefined): Bot
       }
     },
   };
+}
+
+const RECORDS_URL = '/api/bot-records';
+
+/** A snake's results against humans in one mode, from the snake's side. */
+export interface BotRecord {
+  wins: number;
+  losses: number;
+  draws: number;
+}
+
+/** Bot id -> mode -> record; a bot or mode with no rounds is absent. */
+export type BotRecords = Map<string, Partial<Record<GameMode, BotRecord>>>;
+
+const isCount = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
+
+function recordOf(value: unknown): BotRecord | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { wins, losses, draws } = value as Record<string, unknown>;
+  return isCount(wins) && isCount(losses) && isCount(draws) ? { wins, losses, draws } : undefined;
+}
+
+/**
+ * Each snake's record against humans, from `GET /api/bot-records`. Entries that can't be read are ignored; when the
+ * records can't be loaded at all, it is empty and the cards just show no record.
+ */
+export async function loadBotRecords(fetchRecords: RosterFetch = (input) => fetch(input)): Promise<BotRecords> {
+  const records: BotRecords = new Map();
+  let body: unknown;
+  try {
+    const response = await fetchRecords(RECORDS_URL);
+    if (!response.ok) return records;
+    body = await response.json();
+  } catch {
+    return records;
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return records;
+  for (const [botId, modes] of Object.entries(body)) {
+    if (typeof modes !== 'object' || modes === null || Array.isArray(modes)) continue;
+    const byMode: Partial<Record<GameMode, BotRecord>> = {};
+    for (const mode of GAME_MODES) {
+      const record = recordOf((modes as Record<string, unknown>)[mode]);
+      if (record) byMode[mode] = record;
+    }
+    if (Object.keys(byMode).length > 0) records.set(botId, byMode);
+  }
+  return records;
+}
+
+/**
+ * A snake's record as card lines, the chosen mode first: "Timed 5W 2L 1D". A mode with no rounds is left out, and a
+ * snake with no results at all reads "No games yet". Empty when the records couldn't be loaded (`records` undefined).
+ */
+export function recordLines(records: BotRecords | undefined, botId: string, chosen: GameMode): string[] {
+  if (!records) return [];
+  const byMode = records.get(botId) ?? {};
+  const modes = [chosen, ...GAME_MODES.filter((mode) => mode !== chosen)];
+  const lines = modes.flatMap((mode) => {
+    const record = byMode[mode];
+    return record ? [`${MODE_LABELS[mode]} ${record.wins}W ${record.losses}L ${record.draws}D`] : [];
+  });
+  return lines.length > 0 ? lines : ['No games yet'];
 }
