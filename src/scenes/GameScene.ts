@@ -263,7 +263,7 @@ export class GameScene extends Phaser.Scene {
       fontSize: 28,
       onClick: () => this.onStartClicked(),
     });
-    if (!this.vsBot) this.createVsBotButton();
+    this.createVsBotButton();
   }
 
   /** "Play vs Computer" entry point below the lobby panel. */
@@ -284,7 +284,7 @@ export class GameScene extends Phaser.Scene {
 
   /** "Play vs Computer" opens the roster picker; the Name row's DOM input would paint over it, so it's hidden meanwhile. */
   private openRosterPicker(): void {
-    if (this.startInFlight || this.vsBot || this.rosterPicker) return;
+    if (this.startInFlight || this.rosterPicker) return;
     this.setNameRowVisible(false);
     this.rosterPicker = new RosterPicker(this, {
       roster: loadRoster(),
@@ -323,10 +323,8 @@ export class GameScene extends Phaser.Scene {
 
   /** A snake was picked: leave any public room and create a fresh vs-bot one against it, staying in the lobby to press Start. */
   private enterVsBotRoom(): void {
-    if (this.startInFlight || this.vsBot) return;
+    if (this.startInFlight) return;
     this.vsBot = true;
-    this.vsBotButton?.destroy();
-    this.vsBotButton = undefined;
     if (this.sessionConnected) {
       this.commitName();
       socketManager.close();
@@ -373,9 +371,8 @@ export class GameScene extends Phaser.Scene {
   private failStart(roomMissing: boolean): void {
     this.startButton?.setLabel('Start');
     if (this.vsBot && roomMissing) {
-      // The bot room was never created: fall back to the entry point so the player can try again.
+      // The bot room was never created: drop back to the public lobby; the vs-computer button is always shown.
       this.vsBot = false;
-      this.createVsBotButton();
     }
     this.showStartError();
   }
