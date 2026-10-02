@@ -1,4 +1,4 @@
-import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
+import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_RATING_LINE_HEIGHT, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
 import { deathText, roundHeadline, type DeathCause, type RoundEndReason } from '../roundSummary';
 import socketManager from '../SocketManager';
 import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore, postUserScore } from '../Snake';
@@ -24,6 +24,7 @@ import { createBotChoiceStore, loadBotRecords, loadRoster, type RosterEntry } fr
 import { RosterPicker } from '../RosterPicker';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
+import { RATING_LINE_COUNT, ratingLines, searchingText, type RatingUpdate } from '../ranked';
 import { PixelButton } from '../PixelButton';
 import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
 import { FramedPanel } from '../FramedPanel';
@@ -84,6 +85,18 @@ export class GameScene extends Phaser.Scene {
   /** True while playing a private match against the server bot; survives scene restarts so Play Again stays vs-bot. */
   public vsBot: boolean = false;
   private vsBotButton?: PixelButton;
+  /** True while queued for or playing a Ranked match; set by the Ranked button, and dropped on any restart that doesn't pass it. */
+  public ranked: boolean = false;
+  private rankedButton?: PixelButton;
+  private rankedNote?: Phaser.GameObjects.Text;
+  private searchText?: Phaser.GameObjects.Text;
+  private cancelButton?: PixelButton;
+  private searchStartedAt = 0;
+  /** The `ratingUpdate` for the Ranked match being played, which can arrive before or after the Game Over panel is built. */
+  private ratingUpdate?: RatingUpdate;
+  private ratingTexts: Phaser.GameObjects.Text[] = [];
+  /** Set when a Ranked join was refused over the token: the restarted lobby opens the log-in form. */
+  private promptLogin = false;
   /** The roster snake a vs-bot room is created against; remembered on this device and kept across scene restarts. */
   public botId: string = botChoiceStore.load();
   private rosterPicker?: RosterPicker;
@@ -251,6 +264,10 @@ export class GameScene extends Phaser.Scene {
       fontFamily: FONT_FAMILY, fontSize: '32px', color: '#ffffff',
     }).setOrigin(0.5).setShadow(4, 4, '#008000', 0, false, true);
     if (layout.nameRowY !== undefined) this.createNameField(layout.nameRowY);
+    if (this.ranked) {
+      this.createSearching(layout.modeRowY, layout.startY);
+      return;
+    }
     this.createModeRow(layout.modeRowY);
     this.startButton = new PixelButton(this, {
       x: p.x + (p.width - START_BUTTON.width) / 2,
@@ -263,23 +280,100 @@ export class GameScene extends Phaser.Scene {
       fontSize: 28,
       onClick: () => this.onStartClicked(),
     });
-    this.createVsBotButton();
+    this.createEntryButtons();
   }
 
-  /** "Play vs Computer" entry point below the lobby panel. */
-  private createVsBotButton(): void {
+  /** Ranked and "Play vs Computer" entry points side by side below the lobby panel; a Guest's Ranked is disabled with a note. */
+  private createEntryButtons(): void {
     if (this.vsBotButton) return;
     const p = LOBBY_PANEL;
-    const width = 260;
+    const rankedWidth = 200;
+    const botWidth = 260;
+    const gap = 16;
+    const y = p.y + p.height + 4;
+    const left = p.x + (p.width - (rankedWidth + gap + botWidth)) / 2;
+    this.rankedButton = new PixelButton(this, {
+      x: left,
+      y,
+      width: rankedWidth,
+      height: 34,
+      label: 'Ranked',
+      fontSize: 18,
+      disabled: this.guest,
+      onClick: () => this.onRankedClicked(),
+    });
+    if (this.guest) {
+      this.rankedNote = this.add.text(left + rankedWidth / 2, y + 40, 'Create an account to play Ranked', {
+        fontFamily: FONT_FAMILY, fontSize: '14px', color: '#cccccc',
+      }).setOrigin(0.5, 0);
+    }
     this.vsBotButton = new PixelButton(this, {
-      x: p.x + (p.width - width) / 2,
-      y: p.y + p.height + 4,
-      width,
+      x: left + rankedWidth + gap,
+      y,
+      width: botWidth,
       height: 34,
       label: 'Play vs Computer',
       fontSize: 18,
       onClick: () => this.openRosterPicker(),
     });
+  }
+
+  /** The Ranked queue's wait, in place of the Mode row and Start: how long it has lasted, and a way out. */
+  private createSearching(textY: number, buttonY: number): void {
+    const p = LOBBY_PANEL;
+    this.searchStartedAt = this.time.now;
+    this.searchText = this.add.text(p.x + p.width / 2, textY + MODE_ROW.buttonHeight / 2, searchingText(0), {
+      fontFamily: FONT_FAMILY, fontSize: '24px', color: '#ffffff',
+    }).setOrigin(0.5);
+    this.cancelButton = new PixelButton(this, {
+      x: p.x + (p.width - START_BUTTON.width) / 2,
+      y: buttonY,
+      width: START_BUTTON.width,
+      height: START_BUTTON.height,
+      label: 'Cancel',
+      size: 'large',
+      fill: 'button-alt',
+      fontSize: 28,
+      onClick: () => this.onRankedCancelled(),
+    });
+  }
+
+  /** Ranked joins the `ranked` room, so the casual room is left and the scene restarts into the queue. */
+  private onRankedClicked(): void {
+    if (this.guest || this.startInFlight || this.rosterPicker) return;
+    this.socketLeaveForRestart();
+    this.scene.restart({ ranked: true });
+  }
+
+  /** Cancel leaves the Ranked queue and returns to the casual lobby. */
+  private onRankedCancelled(): void {
+    this.socketLeaveForRestart();
+    this.scene.restart({ ranked: false });
+  }
+
+  private socketLeaveForRestart(): void {
+    this.destroyLobbyAmbience();
+    socketManager.close();
+  }
+
+  /** The Ranked room refused the token (it expires after an hour): drop the session and ask for a log-in. */
+  onRankedRefused(): void {
+    if (!this.sys.isActive()) return;
+    localStorage.removeItem('userData');
+    this.promptLogin = true;
+    this.socketLeaveForRestart();
+    this.scene.restart({ ranked: false });
+  }
+
+  /** The Rating change for the Ranked match; shown on the Game Over panel now or when it's built. */
+  onRatingUpdate(update: RatingUpdate): void {
+    this.ratingUpdate = update;
+    this.refreshRatingTexts();
+  }
+
+  private refreshRatingTexts(): void {
+    const lines = ratingLines(this.ratingUpdate, this.playerId);
+    this.ratingTexts.forEach((t, i) => t.setText(lines[i] ?? ''));
   }
 
   /** "Play vs Computer" opens the roster picker; the Name row's DOM input would paint over it, so it's hidden meanwhile. */
@@ -325,6 +419,7 @@ export class GameScene extends Phaser.Scene {
   private enterVsBotRoom(): void {
     if (this.startInFlight) return;
     this.vsBot = true;
+    this.ranked = false;
     if (this.sessionConnected) {
       this.commitName();
       socketManager.close();
@@ -397,6 +492,14 @@ export class GameScene extends Phaser.Scene {
     this.startButton = undefined;
     this.vsBotButton?.destroy();
     this.vsBotButton = undefined;
+    this.rankedButton?.destroy();
+    this.rankedButton = undefined;
+    this.rankedNote?.destroy();
+    this.rankedNote = undefined;
+    this.searchText?.destroy();
+    this.searchText = undefined;
+    this.cancelButton?.destroy();
+    this.cancelButton = undefined;
     this.rosterPicker?.destroy();
     this.rosterPicker = undefined;
     this.startError?.destroy();
@@ -599,6 +702,8 @@ export class GameScene extends Phaser.Scene {
     this.startSent = false;
 
     this.guest = session ? isGuest(userData) : true;
+    // Ranked is for Accounts; a scene restarted as a Guest (logout) comes back to the casual lobby.
+    if (this.guest) this.ranked = false;
     // Guests play under the name they picked last time; logged-in players keep their account username.
     this.name = session ? sessionName(userData, nameStore) : nameStore.load();
     this.playerId = session ? String(userData.userId) : '';
@@ -642,6 +747,11 @@ export class GameScene extends Phaser.Scene {
     }
     this.createLeaderboardPanel();
 
+    if (this.promptLogin) {
+      this.promptLogin = false;
+      this.openLogIn('Your session expired \u2014 log in again');
+    }
+
     if (!session) return;
 
     // connect to websockets
@@ -652,11 +762,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Open the auth overlay on the login form; on success restart so the room is rejoined as the account. */
-  private openLogIn() {
+  private openLogIn(subtitle?: string) {
     // The Name row's DOM input paints above the canvas whatever the Phaser depth, so hide it under the modal.
     this.setNameRowVisible(false);
     const authConfig: AuthModalConfig = {
       initialForm: 'login',
+      subtitle,
       onAuthSuccess: () => this.restartAsAccount(),
       onDismiss: () => this.setNameRowVisible(true),
     };
@@ -792,6 +903,7 @@ export class GameScene extends Phaser.Scene {
 
     // Initialize game state
     this.isGameOver = false;
+    this.ratingUpdate = undefined;
     this.roundMode = modeOf(socketManager.getRoom()?.state.mode ?? this.mode);
   }
 
@@ -842,7 +954,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(DEPTH);
 
-    const c = computeGameOverContentLayout(rankings.length, topScores.length, this.guest, headline.height);
+    const c = computeGameOverContentLayout(rankings.length, topScores.length, this.guest, headline.height, this.ranked ? RATING_LINE_COUNT : 0);
     const panelX = centerX - panelWidth / 2;
     const panelY = Math.max(0, (this.scale.height - c.panelHeight) / 2);
     const contentX = panelX + c.padding;
@@ -886,6 +998,12 @@ export class GameScene extends Phaser.Scene {
       cause.setScale(Math.min(1, (contentWidth - NAME_X) / Math.max(1, cause.width)));
     });
 
+    if (this.ranked) {
+      this.ratingTexts = Array.from({ length: RATING_LINE_COUNT }, (_, i) =>
+        addText(centerX, panelY + c.ratingY + GAME_OVER_RATING_LINE_HEIGHT * (i + 0.5) + 8, '', 20, i === 0 ? '#ffff00' : '#aaaaaa'));
+      this.refreshRatingTexts();
+    }
+
     addText(centerX, panelY + c.subheadingY + 16, `Top scores — ${MODE_LABELS[mode]}`, 22, '#ff4444');
 
     if (topScores.length > 0) {
@@ -911,7 +1029,8 @@ export class GameScene extends Phaser.Scene {
         // Rounds never restart in place: leave the room and rejoin a fresh lobby so no stale round state survives.
         this.destroyLobbyAmbience();
         socketManager.close();
-        this.scene.restart({ vsBot: this.vsBot });
+        // A Ranked match is never re-queued without a click: Play Again lands in the casual lobby.
+        this.scene.restart({ vsBot: this.vsBot, ranked: false });
       },
     }).setDepth(DEPTH);
     this.gameOverObjects.push(playAgain);
@@ -1026,7 +1145,7 @@ export class GameScene extends Phaser.Scene {
   /** Connection dropped: restart into a fresh lobby (no leftover snakes, food or overlays); create() rejoins a new room. */
   onConnectionLost() {
     this.destroyLobbyAmbience();
-    this.scene.restart({ vsBot: this.vsBot });
+    this.scene.restart({ vsBot: this.vsBot, ranked: false });
   }
 
   onReconnecting() {
@@ -1079,6 +1198,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.updateFps(delta);
+    this.searchText?.setText(searchingText(this.time.now - this.searchStartedAt));
     // Re-read every frame so `feature.backgroundDim = x` in the console lands without a reload.
     if (this.bgDim && this.bgDim.alpha !== feature.backgroundDim) this.bgDim.setAlpha(feature.backgroundDim);
     if (!this.gameStarted) {
@@ -1093,9 +1213,12 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  init(data?: { vsBot?: boolean }) {
+  init(data?: { vsBot?: boolean; ranked?: boolean }) {
     // The scene instance survives restarts, so a restart without data keeps the current mode instead of dropping to the public lobby.
     if (data?.vsBot !== undefined) this.vsBot = data.vsBot;
+    this.ranked = data?.ranked ?? false;
+    this.ratingUpdate = undefined;
+    this.ratingTexts = [];
     // Initialize properties here
     this.snakes = new Map();
     this.food = [];

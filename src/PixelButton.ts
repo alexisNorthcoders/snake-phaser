@@ -20,6 +20,8 @@ export interface PixelButtonConfig {
   fill?: ButtonFill;
   fontSize?: number;
   onClick?: () => void;
+  /** Greyed out and inert: no hover, no hand cursor, no click. */
+  disabled?: boolean;
 }
 
 /** Square-cornered bevel button: outline, light/dark inner edges and a drop shadow; owns hover and pressed states. */
@@ -42,24 +44,26 @@ export class PixelButton {
     this.width = config.width;
     this.height = config.height;
     this.size = config.size ?? 'small';
-    this.fill = config.fill ?? 'button';
+    this.fill = config.disabled ? 'field' : (config.fill ?? 'button');
 
     this.gfx = scene.add.graphics().setScrollFactor(0);
     this.text = scene.add
       .text(0, 0, config.label, {
         fontFamily: FONT_FAMILY,
         fontSize: `${config.fontSize ?? 20}px`,
-        color: config.labelColor ?? '#ffffff',
+        color: config.disabled ? '#888888' : (config.labelColor ?? '#ffffff'),
       })
       .setOrigin(0.5)
       .setScrollFactor(0);
     this.zone = scene.add
       .zone(this.x + this.width / 2, this.y + this.height / 2, this.width, this.height)
       .setScrollFactor(0)
-      .setInteractive({ useHandCursor: true });
-    this.zone.on('pointerover', () => this.setHovered(true));
-    this.zone.on('pointerout', () => this.setHovered(false));
-    if (config.onClick) this.zone.on('pointerdown', config.onClick);
+      .setInteractive({ useHandCursor: !config.disabled });
+    if (!config.disabled) {
+      this.zone.on('pointerover', () => this.setHovered(true));
+      this.zone.on('pointerout', () => this.setHovered(false));
+      if (config.onClick) this.zone.on('pointerdown', config.onClick);
+    }
     this.redraw();
   }
 

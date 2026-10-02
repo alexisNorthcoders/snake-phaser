@@ -5,8 +5,9 @@ import { Food } from "./Food";
 import { GameState, tailCells } from "./schemas/Food";
 import { hudTimeLeft } from "./timeLeft";
 import { trackHunger } from "./hunger";
-import { roomEntry } from "./matchmaking";
+import { rankedRoomEntry, roomEntry } from "./matchmaking";
 import { feature } from "./feature";
+import { isTokenRefusal } from "./ranked";
 import { scoreboardRows } from "./utils/scoreboardLayout";
 
 class SocketManager {
@@ -30,7 +31,8 @@ class SocketManager {
     GAME_OVER: "gameOver",
     UPDATE_PLAYER: "updatePlayer",
     PING: "ping",
-    PONG: "pong"
+    PONG: "pong",
+    RATING_UPDATE: "ratingUpdate"
   };
 
   async connect(playerId: string, token: string, scene: GameScene) {
@@ -41,14 +43,14 @@ class SocketManager {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       this.client = new Client(`${protocol}//${host}/colyseus`);
-      const entry = roomEntry(scene.vsBot ? scene.botId : undefined, feature.botReactionTicks, feature.gameSpeed, scene.mode);
-      this.room = await this.client[entry.method]<GameState>("snake", {
-        playerId,
-        token,
-        name: scene.name,
-        colours: scene.snakeColors,
-        ...entry.options
-      });
+      const joinOptions = { playerId, token, name: scene.name, colours: scene.snakeColors };
+      if (scene.ranked) {
+        const entry = rankedRoomEntry(token);
+        this.room = await this.client[entry.method]<GameState>(entry.room, { ...joinOptions, ...entry.options });
+      } else {
+        const entry = roomEntry(scene.vsBot ? scene.botId : undefined, feature.botReactionTicks, feature.gameSpeed, scene.mode);
+        this.room = await this.client[entry.method]<GameState>("snake", { ...joinOptions, ...entry.options });
+      }
 
       console.log("[SocketManager] Connected to room:", this.room.roomId);
 
@@ -84,6 +86,10 @@ class SocketManager {
         if (typeof scene.onGameOver === 'function') {
           scene.onGameOver(payload);
         }
+      });
+
+      this.room.onMessage(SocketManager.messageTypes.RATING_UPDATE, (payload) => {
+        scene.onRatingUpdate?.(payload);
       });
 
       this.room.onMessage(SocketManager.messageTypes.PONG, () => {
@@ -195,6 +201,12 @@ class SocketManager {
 
     } catch (error) {
       console.error("[SocketManager] Could not connect to server:", error);
+      // An expired token won't be accepted on a retry: the player has to log in again.
+      if (scene.ranked && isTokenRefusal(error)) {
+        this.room = null;
+        scene.onRankedRefused?.();
+        return;
+      }
       this.scheduleReconnect();
     }
   }

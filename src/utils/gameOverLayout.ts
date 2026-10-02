@@ -6,6 +6,8 @@ const CANVAS_MARGIN = 16;
 
 export const GAME_OVER_BUTTON = { width: 280, height: 52, gap: 20 } as const;
 export const GAME_OVER_ROW_HEIGHT = 28;
+/** A line of a Ranked match's Rating change, under the Rankings. */
+export const GAME_OVER_RATING_LINE_HEIGHT = 26;
 /** A row of the round's ranking: the name line, and under it how that snake died. `nameY` and `causeY` are line centres. */
 export const GAME_OVER_RANKING_ROW = { height: 44, nameY: 14, causeY: 34 } as const;
 const PADDING = 32;
@@ -31,6 +33,8 @@ export interface GameOverContentLayout {
   headlineY: number;
   dividerY: number;
   roomRowsY: number;
+  /** Top of the Rating lines; they sit between the Rankings and the top scores, and only a Ranked match has any. */
+  ratingY: number;
   subheadingY: number;
   topRowsY: number;
   playAgainY: number;
@@ -46,12 +50,15 @@ export function computeGameOverContentLayout(
   topRows: number,
   guest: boolean,
   headlineHeight: number,
+  ratingLines = 0,
 ): GameOverContentLayout {
   const titleY = PANEL_EDGE + PADDING;
   const headlineY = titleY + TITLE_HEIGHT + HEADLINE_GAP;
   const dividerY = headlineY + headlineHeight + SECTION_GAP / 2;
   const roomRowsY = dividerY + PANEL_EDGE + SECTION_GAP;
-  const subheadingY = roomRowsY + roomRows * GAME_OVER_RANKING_ROW.height + SECTION_GAP;
+  const ratingY = roomRowsY + roomRows * GAME_OVER_RANKING_ROW.height;
+  const ratingHeight = ratingLines > 0 ? ratingLines * GAME_OVER_RATING_LINE_HEIGHT + SECTION_GAP : 0;
+  const subheadingY = ratingY + ratingHeight + SECTION_GAP;
   const topRowsY = subheadingY + SUBHEADING_HEIGHT;
   const playAgainY = topRowsY + Math.max(topRows, 1) * GAME_OVER_ROW_HEIGHT + SECTION_GAP * 2;
   const saveScoreY = guest ? playAgainY + GAME_OVER_BUTTON.height + GAME_OVER_BUTTON.gap : undefined;
@@ -63,6 +70,7 @@ export function computeGameOverContentLayout(
     headlineY,
     dividerY,
     roomRowsY,
+    ratingY,
     subheadingY,
     topRowsY,
     playAgainY,

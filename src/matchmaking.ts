@@ -16,3 +16,14 @@ export function roomEntry(botId: string | undefined, botReactionTicks: number, s
         ? { method: 'create', options: { vsBot: true, botId, botReactionTicks, speed, mode } }
         : { method: 'joinOrCreate', options: { speed, mode } }
 }
+
+export interface RankedRoomEntry {
+    room: 'ranked'
+    method: 'joinOrCreate'
+    options: { token: string }
+}
+
+/** Ranked is always a join into the `ranked` queue; the token is what the room admits an Account by, and it ignores every other option. */
+export function rankedRoomEntry(token: string): RankedRoomEntry {
+    return { room: 'ranked', method: 'joinOrCreate', options: { token } }
+}
