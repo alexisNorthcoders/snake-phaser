@@ -1,6 +1,6 @@
 import { GAME_MODES } from '../gameMode.ts';
 
-export type LeaderboardTab = 'global' | 'mine';
+export type LeaderboardTab = 'global' | 'mine' | 'rating';
 
 export const LEADERBOARD_ROWS = 5;
 
@@ -101,5 +101,21 @@ export function mineRows(
     rank: `${i + 1}.`,
     label: formatDate(e.timestamp),
     score: String(e.score),
+  }));
+}
+
+/** One Account on the Rating leaderboard, as go-server lists it. */
+export interface RatingEntry {
+  username: string;
+  rating: number;
+  rankedMatches: number;
+}
+
+/** Top five Accounts by Rating as rank / name / Rating rows. */
+export function ratingRows(entries: readonly RatingEntry[]): LeaderboardRow[] {
+  return entries.slice(0, LEADERBOARD_ROWS).map((e, i) => ({
+    rank: `${i + 1}.`,
+    label: e.username,
+    score: String(Math.round(e.rating)),
   }));
 }

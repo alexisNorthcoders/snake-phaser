@@ -7,6 +7,7 @@ import {
   computeLeaderboardPanelLayout,
   globalRows,
   mineRows,
+  ratingRows,
 } from '../src/utils/leaderboardPanelLayout.ts';
 
 test('panel sits at (120, 600), 560 wide, scrim 0.8, and stays on the 800px canvas', () => {
@@ -59,4 +60,12 @@ test('mine rows show the date in place of the name', () => {
 test('no entries yields no rows', () => {
   assert.deepEqual(globalRows([]), []);
   assert.deepEqual(mineRows([]), []);
+});
+
+test('the Rating tab lists the top five by Rating, rounded, in the score column', () => {
+  const entries = Array.from({ length: 7 }, (_, i) => ({ username: `p${i}`, rating: 1600.6 - i, rankedMatches: 9 }));
+  const rows = ratingRows(entries);
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows[0], { rank: '1.', label: 'p0', score: '1601' });
+  assert.deepEqual(ratingRows([]), []);
 });

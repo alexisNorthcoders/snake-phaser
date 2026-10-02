@@ -5,6 +5,8 @@ import { unwrapChain, wrapCell } from './BodyWrap'
 import { drawSnake, type SnakeDrawing } from './SnakeDrawing'
 import { feature } from './feature'
 import type { GameMode } from './gameMode'
+import type { AccountRating } from './ranked'
+import type { RatingEntry } from './utils/leaderboardPanelLayout'
 
 interface SnakeColorSet {
     body?: string
@@ -265,5 +267,23 @@ export async function getLeaderboard(mode: GameMode): Promise<HighScore[]> {
     } catch (error) {
         console.error("❌ Error fetching leaderboard: ", error);
         return [];
+    }
+}
+
+/** The Rating leaderboard: Accounts by Rating, highest first. Needs no token. */
+export async function getRatingLeaderboard(): Promise<RatingEntry[]> {
+    const response = await fetch('/api/rating-leaderboard');
+    if (!response.ok) throw new Error(`Failed to get rating leaderboard: ${response.status}`);
+    return (await response.json()) ?? [];
+}
+
+/** One Account's Rating and Ranked match count; undefined when it can't be fetched. */
+export async function getAccountRating(userId: string): Promise<AccountRating | undefined> {
+    try {
+        const response = await fetch(`/api/rating?userId=${encodeURIComponent(userId)}`);
+        if (!response.ok) return undefined;
+        return await response.json();
+    } catch {
+        return undefined;
     }
 }
