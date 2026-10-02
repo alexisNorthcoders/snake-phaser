@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isTokenRefusal, matchedWithText, ratingChangeText, ratingLines, searchingText, type RatingChange } from '../src/ranked.ts';
+import { isTokenRefusal, lobbyRatingText, matchedWithText, ratingChangeText, ratingLines, searchingText, type RatingChange } from '../src/ranked.ts';
 import { rankedRoomEntry } from '../src/matchmaking.ts';
 
 const change = (over: Partial<RatingChange> = {}): RatingChange => ({
@@ -54,4 +54,10 @@ test('a Ranked match names the other player, or says nothing until someone is ma
 
 test('a Stand-in opponent is labelled as a bot', () => {
   assert.equal(matchedWithText([{ id: 'a', name: 'Me', isBot: false }, { id: 'bot:r', name: 'Rookie', isBot: true }], 'a'), 'Matched with Rookie (bot)');
+});
+
+test('the lobby shows an Account\'s Rating, or its Provisional progress, and nothing for a Guest', () => {
+  assert.equal(lobbyRatingText({ rating: 1532.4, rankedMatches: 9, provisional: false }), 'Rating 1532');
+  assert.equal(lobbyRatingText({ rating: 1500, rankedMatches: 2, provisional: true }), 'Provisional (2/5)');
+  assert.equal(lobbyRatingText(undefined), '');
 });

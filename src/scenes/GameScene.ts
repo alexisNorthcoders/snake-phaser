@@ -1,7 +1,7 @@
 import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_RATING_LINE_HEIGHT, GAME_OVER_ROW_HEIGHT, rankingName } from '../utils/gameOverLayout';
 import { deathText, roundHeadline, type DeathCause, type RoundEndReason } from '../roundSummary';
 import socketManager from '../SocketManager';
-import { Snake, getHighScores, getLeaderboard, HighScore, postAnonymousScore, postUserScore } from '../Snake';
+import { Snake, getAccountRating, getHighScores, getLeaderboard, getRatingLeaderboard, HighScore, postAnonymousScore, postUserScore } from '../Snake';
 import { saveRoundScore } from '../roundScore';
 import { Food } from '../Food';
 import { FOOD_TYPES, foodTexturePath } from '../foodTextures';
@@ -24,7 +24,7 @@ import { createBotChoiceStore, loadBotRecords, loadRoster, type RosterEntry } fr
 import { RosterPicker } from '../RosterPicker';
 import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
-import { RATING_LINE_COUNT, ratingLines, searchingText, type RatingUpdate } from '../ranked';
+import { RATING_LINE_COUNT, lobbyRatingText, ratingLines, searchingText, type RatingUpdate } from '../ranked';
 import { PixelButton } from '../PixelButton';
 import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
 import { FramedPanel } from '../FramedPanel';
@@ -89,6 +89,8 @@ export class GameScene extends Phaser.Scene {
   public ranked: boolean = false;
   private rankedButton?: PixelButton;
   private rankedNote?: Phaser.GameObjects.Text;
+  /** The Account's own Rating under the Ranked button; absent for a Guest. */
+  private ratingLabel?: Phaser.GameObjects.Text;
   private searchText?: Phaser.GameObjects.Text;
   private matchedText?: Phaser.GameObjects.Text;
   private cancelButton?: PixelButton;
@@ -307,6 +309,15 @@ export class GameScene extends Phaser.Scene {
       this.rankedNote = this.add.text(left + rankedWidth / 2, y + 40, 'Create an account to play Ranked', {
         fontFamily: FONT_FAMILY, fontSize: '14px', color: '#cccccc',
       }).setOrigin(0.5, 0);
+    } else {
+      this.ratingLabel = this.add.text(left + rankedWidth / 2, y + 40, '', {
+        fontFamily: FONT_FAMILY, fontSize: '14px', color: '#cccccc',
+      }).setOrigin(0.5, 0);
+      const label = this.ratingLabel;
+      getAccountRating(this.playerId).then((rating) => {
+        // Dropped if the lobby was torn down (or rebuilt) while the fetch was in flight.
+        if (this.ratingLabel === label && label.active) label.setText(lobbyRatingText(rating));
+      });
     }
     this.vsBotButton = new PixelButton(this, {
       x: left + rankedWidth + gap,
@@ -508,6 +519,8 @@ export class GameScene extends Phaser.Scene {
     this.rankedButton = undefined;
     this.rankedNote?.destroy();
     this.rankedNote = undefined;
+    this.ratingLabel?.destroy();
+    this.ratingLabel = undefined;
     this.searchText?.destroy();
     this.searchText = undefined;
     this.cancelButton?.destroy();
@@ -847,6 +860,7 @@ export class GameScene extends Phaser.Scene {
     this.destroyLeaderboardPanel();
     this.leaderboardPanel = new LeaderboardPanel(this, {
       fetchGlobal: getLeaderboard,
+      fetchRating: getRatingLeaderboard,
       loadMine: (mode) => LocalScoresManager.getTopScores(mode, 5),
     }, this.mode);
   }

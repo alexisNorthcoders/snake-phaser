@@ -58,3 +58,17 @@ export function matchedWithText(players: RoomPlayer[], selfId: string | undefine
   if (!opponent) return undefined;
   return `Matched with ${opponent.name}${opponent.isBot ? ' (bot)' : ''}`;
 }
+
+/** An Account's standing as go-server's `/rating` reports it. */
+export interface AccountRating {
+  rating: number;
+  rankedMatches: number;
+  provisional: boolean;
+}
+
+/** The lobby line for an Account: "Rating 1532", or "Provisional (2/5)"; empty for a Guest or before it's known. */
+export function lobbyRatingText(rating: AccountRating | undefined): string {
+  if (!rating) return '';
+  if (rating.provisional) return `Provisional (${rating.rankedMatches}/${PROVISIONAL_MATCHES})`;
+  return `Rating ${Math.round(rating.rating)}`;
+}

@@ -11,23 +11,26 @@ import {
   computeLeaderboardPanelLayout,
   globalRows,
   mineRows,
+  ratingRows,
   type GlobalScoreEntry,
   type LeaderboardRow,
   type LeaderboardTab,
   type LocalScoreEntry,
+  type RatingEntry,
 } from './utils/leaderboardPanelLayout';
 
 export interface LeaderboardPanelSources {
   fetchGlobal: (mode: GameMode) => Promise<GlobalScoreEntry[]>;
   loadMine: (mode: GameMode) => LocalScoreEntry[];
+  fetchRating: () => Promise<RatingEntry[]>;
 }
 
-const TAB_LABELS: Record<LeaderboardTab, string> = { global: 'Global', mine: 'Mine' };
+const TAB_LABELS: Record<LeaderboardTab, string> = { global: 'Global', mine: 'Mine', rating: 'Rating' };
 const TAB_SELECTED = '#ffff00';
 const TAB_MUTED = '#777777';
 const ROW_COLOR = '#aaaaaa';
 
-/** Framed Global / Mine leaderboard for one mode at a time, switched Timed / Endless; owns its objects and draws nothing once destroyed, even for a late fetch. */
+/** Framed Global / Mine / Rating leaderboard for one mode at a time, switched Timed / Endless; owns its objects and draws nothing once destroyed, even for a late fetch. */
 export class LeaderboardPanel {
   private readonly frame: FramedPanel;
   private readonly layout = computeLeaderboardPanelLayout();
@@ -37,6 +40,7 @@ export class LeaderboardPanel {
   private rowObjects: Phaser.GameObjects.Text[] = [];
   private tab: LeaderboardTab = 'global';
   private globalEntries?: GlobalScoreEntry[];
+  private ratingEntries?: RatingEntry[];
   private destroyed = false;
 
   constructor(
@@ -49,7 +53,7 @@ export class LeaderboardPanel {
     this.frame = new FramedPanel(scene, p.x, p.y, p.width, p.height, p.scrimAlpha);
 
     let tabX = l.contentX;
-    for (const tab of ['global', 'mine'] as const) {
+    for (const tab of ['global', 'mine', 'rating'] as const) {
       const text = scene.add
         .text(tabX, l.headerY + l.headerHeight / 2, TAB_LABELS[tab], {
           fontFamily: FONT_FAMILY, fontSize: '18px', color: TAB_MUTED,
@@ -117,6 +121,14 @@ export class LeaderboardPanel {
   }
 
   private refresh(): void {
+    this.sources
+      .fetchRating()
+      .catch(() => [] as RatingEntry[])
+      .then((entries) => {
+        if (this.destroyed) return;
+        this.ratingEntries = entries;
+        this.render();
+      });
     const mode = this.mode;
     this.sources
       .fetchGlobal(mode)
@@ -136,13 +148,17 @@ export class LeaderboardPanel {
       button.setFill(selected ? 'button-alt' : 'field').setPressed(selected);
     });
     this.clearRows();
-    if (this.tab === 'global' && !this.globalEntries) {
+    const loading = this.tab === 'global' ? !this.globalEntries : this.tab === 'rating' && !this.ratingEntries;
+    if (loading) {
       this.addRow(this.layout.nameX, this.layout.rowsY, 'Loading...', 0);
       return;
     }
-    const rows = this.tab === 'global' ? globalRows(this.globalEntries!) : mineRows(this.sources.loadMine(this.mode));
+    const rows =
+      this.tab === 'global' ? globalRows(this.globalEntries!)
+      : this.tab === 'rating' ? ratingRows(this.ratingEntries!)
+      : mineRows(this.sources.loadMine(this.mode));
     if (rows.length === 0) {
-      this.addRow(this.layout.nameX, this.layout.rowsY, 'No scores yet', 0);
+      this.addRow(this.layout.nameX, this.layout.rowsY, this.tab === 'rating' ? 'Nobody is rated yet' : 'No scores yet', 0);
       return;
     }
     rows.forEach((row, i) => this.drawRow(row, this.layout.rowsY + i * this.layout.rowHeight));
