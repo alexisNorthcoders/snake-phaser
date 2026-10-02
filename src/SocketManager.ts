@@ -7,7 +7,7 @@ import { hudTimeLeft } from "./timeLeft";
 import { trackHunger } from "./hunger";
 import { rankedRoomEntry, roomEntry } from "./matchmaking";
 import { feature } from "./feature";
-import { isTokenRefusal } from "./ranked";
+import { isTokenRefusal, matchedWithText } from "./ranked";
 import { scoreboardRows } from "./utils/scoreboardLayout";
 
 class SocketManager {
@@ -145,6 +145,10 @@ class SocketManager {
         });
 
         this.updateScoreboard(scene, state);
+        if (scene.ranked) {
+          const players = Array.from(state.players.values()).map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
+          scene.setMatchedWith?.(matchedWithText(players, this.room?.sessionId));
+        }
 
         scene.onPhaseState?.(state.phase, state.countdown);
         scene.setTimeLeft?.(hudTimeLeft(state.phase, state.mode, state.ticksLeft, state.tickMs));

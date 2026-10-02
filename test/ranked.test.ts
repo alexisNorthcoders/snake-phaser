@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isTokenRefusal, ratingChangeText, ratingLines, searchingText, type RatingChange } from '../src/ranked.ts';
+import { isTokenRefusal, matchedWithText, ratingChangeText, ratingLines, searchingText, type RatingChange } from '../src/ranked.ts';
 import { rankedRoomEntry } from '../src/matchmaking.ts';
 
 const change = (over: Partial<RatingChange> = {}): RatingChange => ({
@@ -44,4 +44,14 @@ test('only an auth refusal from the room counts as a token refusal', () => {
   assert.equal(isTokenRefusal({ code: 500 }), false);
   assert.equal(isTokenRefusal(new Error('network')), false);
   assert.equal(isTokenRefusal(null), false);
+});
+
+test('a Ranked match names the other player, or says nothing until someone is matched', () => {
+  assert.equal(matchedWithText([{ id: 'a', name: 'Me', isBot: false }], 'a'), undefined);
+  assert.equal(matchedWithText([{ id: 'a', name: 'Me', isBot: false }, { id: 'b', name: 'Alex', isBot: false }], 'a'), 'Matched with Alex');
+  assert.equal(matchedWithText([{ id: 'a', name: 'Me', isBot: false }, { id: 'b', name: 'Alex', isBot: false }], 'b'), 'Matched with Me');
+});
+
+test('a Stand-in opponent is labelled as a bot', () => {
+  assert.equal(matchedWithText([{ id: 'a', name: 'Me', isBot: false }, { id: 'bot:r', name: 'Rookie', isBot: true }], 'a'), 'Matched with Rookie (bot)');
 });
