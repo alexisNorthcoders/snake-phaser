@@ -44,3 +44,17 @@ export function isTokenRefusal(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   return code === 401 || code === 4215;
 }
+
+/** A player as the room lists them. */
+export interface RoomPlayer {
+  id: string;
+  name: string;
+  isBot: boolean;
+}
+
+/** "Matched with Alex", or "Matched with Rookie (bot)" for a Stand-in; undefined until an opponent is seated. */
+export function matchedWithText(players: RoomPlayer[], selfId: string | undefined): string | undefined {
+  const opponent = players.find((p) => p.id !== selfId);
+  if (!opponent) return undefined;
+  return `Matched with ${opponent.name}${opponent.isBot ? ' (bot)' : ''}`;
+}

@@ -90,6 +90,7 @@ export class GameScene extends Phaser.Scene {
   private rankedButton?: PixelButton;
   private rankedNote?: Phaser.GameObjects.Text;
   private searchText?: Phaser.GameObjects.Text;
+  private matchedText?: Phaser.GameObjects.Text;
   private cancelButton?: PixelButton;
   private searchStartedAt = 0;
   /** The `ratingUpdate` for the Ranked match being played, which can arrive before or after the Game Over panel is built. */
@@ -363,6 +364,17 @@ export class GameScene extends Phaser.Scene {
     this.promptLogin = true;
     this.socketLeaveForRestart();
     this.scene.restart({ ranked: false });
+  }
+
+  /** "Matched with …" under the header once the Ranked match has an opponent. */
+  setMatchedWith(text: string | undefined): void {
+    if (text === undefined) return;
+    if (!this.matchedText) {
+      this.matchedText = this.add.text(this.scale.width / 2, HEADER_BOTTOM + 16, text, {
+        fontFamily: FONT_FAMILY, fontSize: '22px', color: '#ffffff', stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5, 0).setDepth(10);
+    }
+    this.matchedText.setText(text);
   }
 
   /** The Rating change for the Ranked match; shown on the Game Over panel now or when it's built. */
@@ -1219,6 +1231,7 @@ export class GameScene extends Phaser.Scene {
     this.ranked = data?.ranked ?? false;
     this.ratingUpdate = undefined;
     this.ratingTexts = [];
+    this.matchedText = undefined;
     // Initialize properties here
     this.snakes = new Map();
     this.food = [];
@@ -1251,6 +1264,8 @@ export class GameScene extends Phaser.Scene {
     this.pingText?.destroy();
     this.destroyFpsText();
     this.resetCountdown();
+    this.matchedText?.destroy();
+    this.matchedText = undefined;
     this.pingBars?.destroy();
     this.pingBars = undefined;
     this.destroyTimeLeftText();
