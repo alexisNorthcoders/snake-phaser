@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_ROW_HEIGHT } from '../src/utils/gameOverLayout.ts';
+import { computeGameOverContentLayout, computeGameOverLayout, GAME_OVER_BUTTON, GAME_OVER_RANKING_ROW, GAME_OVER_RATING_LINE_HEIGHT, GAME_OVER_ROW_HEIGHT } from '../src/utils/gameOverLayout.ts';
 
 test('desktop 800px: centre 400, width 480', () => {
   assert.deepEqual(computeGameOverLayout(800), { centerX: 400, panelWidth: 480, contentWidth: 416 });
@@ -58,4 +58,14 @@ test('rankingName tags only bots', async () => {
   const { rankingName } = await import('../src/utils/gameOverLayout.ts');
   assert.equal(rankingName('Bot', true), 'Bot [BOT]');
   assert.equal(rankingName('Bot', false), 'Bot');
+});
+
+test('a Ranked match reserves room for its Rating lines between the Rankings and the top scores', () => {
+  const casual = computeGameOverContentLayout(2, 3, false, 24);
+  const ranked = computeGameOverContentLayout(2, 3, false, 24, 2);
+  assert.equal(casual.ratingY, ranked.ratingY);
+  assert.ok(ranked.subheadingY > ranked.ratingY + 2 * GAME_OVER_RATING_LINE_HEIGHT);
+  assert.equal(ranked.panelHeight - casual.panelHeight, ranked.subheadingY - casual.subheadingY);
+  assert.ok(ranked.panelHeight > casual.panelHeight);
+  assert.equal(computeGameOverContentLayout(2, 3, false, 24, 0).panelHeight, casual.panelHeight);
 });
