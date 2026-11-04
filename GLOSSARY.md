@@ -13,3 +13,4 @@ The browser client: the lobby, the game screen and the game-over screen, played 
 **Provisional**: a Rating based on fewer than 5 Ranked matches, shown with its progress ("Provisional (2/5)").
 **Stand-in**: a roster bot that plays a Ranked match in place of a human after a wait alone.
 **Rankings**: the game-over list of each snake's score and how it died.
+**Swipe**: steering on a touchscreen: dragging a finger up, down, left or right turns the snake that way. One drag can make several turns without lifting the finger.
