@@ -274,7 +274,7 @@ export class GameScene extends Phaser.Scene {
     const layout = computeLobbyPanelLayout(this.guest);
     this.lobbyPanel = new FramedPanel(this, p.x, p.y, p.width, p.height, p.scrimAlpha);
     this.lobbyPanel.addDivider(layout.contentX, layout.dividerY, layout.contentWidth);
-    this.lobbyTitle = this.add.text(p.x + p.width / 2, layout.titleY + TITLE_HEIGHT / 2, 'Snake Game', {
+    this.lobbyTitle = this.add.text(p.x + p.width / 2, layout.titleY + TITLE_HEIGHT / 2, 'Snake MP', {
       fontFamily: FONT_FAMILY, fontSize: '32px', color: '#ffffff',
     }).setOrigin(0.5).setShadow(4, 4, '#008000', 0, false, true);
     if (layout.nameRowY !== undefined) this.createNameField(layout.nameRowY);
