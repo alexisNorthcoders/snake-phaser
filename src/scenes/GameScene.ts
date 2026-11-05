@@ -267,7 +267,7 @@ export class GameScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  /** The framed lobby panel: title, divider, Mode row and Start button; the Name row is added for guests. */
+  /** The framed lobby panel: title, divider, Mode row and Play button; the Name row is added for guests. */
   private createLobbyPanel(): void {
     this.destroyLobbyPanel();
     const p = LOBBY_PANEL;
@@ -288,7 +288,7 @@ export class GameScene extends Phaser.Scene {
       y: layout.startY,
       width: START_BUTTON.width,
       height: START_BUTTON.height,
-      label: 'Start',
+      label: 'Play',
       size: 'large',
       fill: 'action',
       fontSize: 28,
@@ -341,7 +341,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** The Ranked queue's wait, in place of the Mode row and Start: how long it has lasted, and a way out. */
+  /** The Ranked queue's wait, in place of the Mode row and Play: how long it has lasted, and a way out. */
   private createSearching(textY: number, buttonY: number): void {
     const p = LOBBY_PANEL;
     this.searchStartedAt = this.time.now;
@@ -449,7 +449,7 @@ export class GameScene extends Phaser.Scene {
     void this.startAsNewGuest(true);
   }
 
-  /** A snake was picked: leave any public room and create a fresh vs-bot one against it, staying in the lobby to press Start. */
+  /** A snake was picked: leave any public room and create a fresh vs-bot one against it, staying in the lobby to press Play. */
   private enterVsBotRoom(): void {
     if (this.startInFlight) return;
     this.vsBot = true;
@@ -498,7 +498,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private failStart(roomMissing: boolean): void {
-    this.startButton?.setLabel('Start');
+    this.startButton?.setLabel('Play');
     if (this.vsBot && roomMissing) {
       // The bot room was never created: drop back to the public lobby; the vs-computer button is always shown.
       this.vsBot = false;
@@ -508,7 +508,7 @@ export class GameScene extends Phaser.Scene {
 
   private showStartError(): void {
     const p = LOBBY_PANEL;
-    this.startError = this.add.text(p.x + p.width / 2, p.y + p.height + 16, "Can't reach the server \u2014 press Start to try again", {
+    this.startError = this.add.text(p.x + p.width / 2, p.y + p.height + 16, "Can't reach the server \u2014 press Play to try again", {
       fontFamily: FONT_FAMILY,
       fontSize: '18px',
       color: '#ff6666',
