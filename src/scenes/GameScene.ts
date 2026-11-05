@@ -37,7 +37,7 @@ import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
-import { createSwipe, type Direction } from '../swipe';
+import { createFingerSwipe, type Direction } from '../swipe';
 import type { HudTimeLeft } from '../timeLeft';
 import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
@@ -717,33 +717,25 @@ export class GameScene extends Phaser.Scene {
    * positions are converted back to CSS px before the Swipe sees them.
    */
   private listenForSwipes(): void {
-    const swipe = createSwipe();
-    let fingerId: number | null = null;
+    const swipe = createFingerSwipe();
     const toCssPx = (pointer: Phaser.Input.Pointer) => ({
       x: pointer.x / this.scale.displayScale.x,
       y: pointer.y / this.scale.displayScale.y,
     });
 
-    // A press that starts on a button (the header's Scores toggle, say) is a tap, never a swipe.
+    // `over` is every interactive object under the press, so the header's Scores toggle (or any button) is a tap, never a swipe.
     const onDown = (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
-      if (fingerId !== null || over.length > 0) return;
-      fingerId = pointer.id;
       const { x, y } = toCssPx(pointer);
-      swipe.down(x, y);
+      swipe.down(pointer.id, x, y, over.length > 0);
     };
     const onMove = (pointer: Phaser.Input.Pointer) => {
-      if (pointer.id !== fingerId) return;
       const { x, y } = toCssPx(pointer);
       // Outside play the finger's travel is discarded, so the first turn after GO! starts from where it is then.
-      if (this.lastPhase !== 'playing' || !this.gameStarted || this.isGameOver) return swipe.down(x, y);
-      const turn = swipe.move(x, y);
+      if (this.lastPhase !== 'playing' || !this.gameStarted || this.isGameOver) return swipe.rebase(pointer.id, x, y);
+      const turn = swipe.move(pointer.id, x, y);
       if (turn) this.sendPlayerMovement(turn);
     };
-    const onUp = (pointer: Phaser.Input.Pointer) => {
-      if (pointer.id !== fingerId) return;
-      fingerId = null;
-      swipe.up();
-    };
+    const onUp = (pointer: Phaser.Input.Pointer) => swipe.up(pointer.id);
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, onDown);
     this.input.on(Phaser.Input.Events.POINTER_MOVE, onMove);
