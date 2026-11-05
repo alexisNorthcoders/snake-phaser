@@ -50,6 +50,10 @@ pm2 jlist | node -e "JSON.parse(require('fs').readFileSync(0,'utf8')).forEach(p 
 If the port owner's PID doesn't match pm2's reported PID (or its child process tree), a
 manually-started duplicate is holding the port — kill it, then `pm2 restart` the real one.
 
+## Share card
+
+`npm run share-card` rebuilds `public/share-card.png` from a real match; see `tools/share-card/README.md`.
+
 ## Agent skills
 
 ### Issue tracker
