@@ -12,6 +12,7 @@ const PITCH = 'Multiplayer snake in your browser. Eat, grow, cut off rivals. No 
 /** Once the match is in play with two live snakes, how long to let them grow before capturing. */
 const SETTLE_MS = 3000
 const MATCH_TIMEOUT_MS = 60000
+const ROOM_TIMEOUT_MS = 20000
 const FONT_FILE = fileURLToPath(import.meta.resolve('@fontsource/pixelify-sans/files/pixelify-sans-latin-500-normal.woff2'))
 
 const { values } = parseArgs({
@@ -45,7 +46,22 @@ async function matchIsOn(page: Page): Promise<boolean> {
   })
 }
 
+/** Polls until the page's SocketManager holds a joined room, so the match poll below never races the connection. */
+async function waitForRoom(page: Page): Promise<void> {
+  const deadline = Date.now() + ROOM_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    const joined = await page.evaluate(async () => {
+      const { default: socketManager } = await import(/* @vite-ignore */ '/src/SocketManager.ts')
+      return !!socketManager.getRoom()?.state
+    })
+    if (joined) return
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  throw new Error(`never joined a room within ${ROOM_TIMEOUT_MS / 1000}s; are the dev server and snake-colyseus up?`)
+}
+
 async function waitForMatch(page: Page): Promise<void> {
+  await waitForRoom(page)
   const deadline = Date.now() + MATCH_TIMEOUT_MS
   while (Date.now() < deadline) {
     if (await matchIsOn(page)) {
@@ -84,7 +100,7 @@ async function composeCard(browser: Awaited<ReturnType<typeof puppeteer.launch>>
     @font-face { font-family: 'Pixelify Sans'; font-weight: 500; src: url(data:font/woff2;base64,${font}); }
     html, body { margin: 0; width: ${CARD.width}px; height: ${CARD.height}px; background: ${THEME_BACKGROUND}; overflow: hidden; }
     .arena { position: absolute; top: 0; right: 0; width: ${CARD.height}px; height: ${CARD.height}px; border-left: 6px solid #fff; box-sizing: border-box;
-      background: url(data:image/png;base64,${arena.toString('base64')}) no-repeat; background-size: cover; image-rendering: pixelated; }
+      background: url(data:image/png;base64,${arena.toString('base64')}) no-repeat; background-size: 100% 100%; image-rendering: pixelated; }
     .text { position: absolute; left: 0; top: 0; bottom: 0; width: ${CARD.width - CARD.height}px; padding: 0 44px; box-sizing: border-box;
       display: flex; flex-direction: column; justify-content: center; font-family: 'Pixelify Sans'; color: #fff; }
     h1 { margin: 0 0 28px; font-size: 92px; font-weight: 500; line-height: 1; text-shadow: 6px 6px 0 #008000; }
