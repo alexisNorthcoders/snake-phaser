@@ -52,7 +52,11 @@ export function computeBevelRects(
 }
 
 export const HEADER_HEIGHT = 40;
-export const HEADER_BUTTON = { width: 90, height: 30, margin: 20 } as const;
+/** `gap` separates the header button from the scoreboard button on its left. */
+export const HEADER_BUTTON = { width: 90, height: 30, margin: 20, gap: 8 } as const;
+export const SCOREBOARD_BUTTON = { width: 80, label: 'Scores' } as const;
+/** Space between the header timer or hunger bar and the scoreboard button on its right. */
+export const HEADER_ITEM_GAP = 16;
 
 /** Top-left of the header button: right-aligned 20px from the canvas edge, centred in the 40px strip. */
 export function headerButtonPosition(canvasWidth: number): { x: number; y: number } {
@@ -60,4 +64,15 @@ export function headerButtonPosition(canvasWidth: number): { x: number; y: numbe
     x: canvasWidth - HEADER_BUTTON.margin - HEADER_BUTTON.width,
     y: (HEADER_HEIGHT - HEADER_BUTTON.height) / 2,
   };
+}
+
+/** Top-left of the scoreboard toggle, just left of the header button and level with it. */
+export function scoreboardButtonPosition(canvasWidth: number): { x: number; y: number } {
+  const header = headerButtonPosition(canvasWidth);
+  return { x: header.x - HEADER_BUTTON.gap - SCOREBOARD_BUTTON.width, y: header.y };
+}
+
+/** Right edge for the header's timer or hunger bar, which are right-aligned beside the buttons. */
+export function headerItemsRight(canvasWidth: number): number {
+  return scoreboardButtonPosition(canvasWidth).x - HEADER_ITEM_GAP;
 }

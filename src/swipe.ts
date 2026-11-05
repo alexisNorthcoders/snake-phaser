@@ -32,3 +32,35 @@ export function createSwipe(): Swipe {
     },
   };
 }
+
+/** One Swipe driven by raw pointer events: the first finger down owns it, and a press that starts on a button never swipes. */
+export interface FingerSwipe {
+  down(fingerId: number, x: number, y: number, onButton: boolean): void;
+  move(fingerId: number, x: number, y: number): Direction | null;
+  /** Moves the owning finger's origin without turning, discarding its travel so far. */
+  rebase(fingerId: number, x: number, y: number): void;
+  up(fingerId: number): void;
+}
+
+export function createFingerSwipe(): FingerSwipe {
+  const swipe = createSwipe();
+  let owner: number | null = null;
+  return {
+    down(fingerId, x, y, onButton) {
+      if (owner !== null || onButton) return;
+      owner = fingerId;
+      swipe.down(x, y);
+    },
+    move(fingerId, x, y) {
+      return fingerId === owner ? swipe.move(x, y) : null;
+    },
+    rebase(fingerId, x, y) {
+      if (fingerId === owner) swipe.down(x, y);
+    },
+    up(fingerId) {
+      if (fingerId !== owner) return;
+      owner = null;
+      swipe.up();
+    },
+  };
+}

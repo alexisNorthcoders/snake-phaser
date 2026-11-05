@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSwipe, type Direction } from '../src/swipe.ts';
+import { createFingerSwipe, createSwipe, type Direction } from '../src/swipe.ts';
 
 type Step = ['down' | 'move', number, number] | ['up'];
 
@@ -56,4 +56,38 @@ test('pressing again starts a fresh gesture from the new point', () => {
     turns([['down', 100, 100], ['move', 120, 100], ['up'], ['down', 300, 300], ['move', 285, 300], ['move', 300, 330]]),
     ['d'],
   );
+});
+
+test('a press that starts on a button, such as the header Scores toggle, never steers', () => {
+  const swipe = createFingerSwipe();
+  swipe.down(1, 640, 20, true);
+  assert.equal(swipe.move(1, 640, 120), null);
+  assert.equal(swipe.move(1, 400, 120), null);
+  swipe.up(1);
+});
+
+test('a button press does not claim the swipe, so another finger can still steer', () => {
+  const swipe = createFingerSwipe();
+  swipe.down(1, 640, 20, true);
+  swipe.down(2, 100, 100, false);
+  assert.equal(swipe.move(1, 640, 200), null);
+  assert.equal(swipe.move(2, 130, 100), 'r');
+});
+
+test('a press off any button steers, and only its own finger does', () => {
+  const swipe = createFingerSwipe();
+  swipe.down(1, 100, 100, false);
+  swipe.down(2, 300, 300, false);
+  assert.equal(swipe.move(2, 300, 400), null);
+  assert.equal(swipe.move(1, 100, 70), 'u');
+  swipe.up(1);
+  assert.equal(swipe.move(1, 200, 70), null);
+});
+
+test('rebasing discards the owning finger\'s travel so far', () => {
+  const swipe = createFingerSwipe();
+  swipe.down(1, 100, 100, false);
+  swipe.rebase(1, 200, 100);
+  assert.equal(swipe.move(1, 210, 100), null);
+  assert.equal(swipe.move(1, 230, 100), 'r');
 });

@@ -26,12 +26,18 @@ import { authModalManager, AuthModalConfig } from '../utils/authModalManager';
 import { FONT_FAMILY } from '../font';
 import { RATING_LINE_COUNT, lobbyRatingText, ratingLines, searchingText, type RatingUpdate } from '../ranked';
 import { PixelButton } from '../PixelButton';
-import { HEADER_BUTTON, headerButtonPosition } from '../utils/pixelButtonStyle';
+import {
+  HEADER_BUTTON,
+  SCOREBOARD_BUTTON,
+  headerButtonPosition,
+  headerItemsRight,
+  scoreboardButtonPosition,
+} from '../utils/pixelButtonStyle';
 import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
-import { createSwipe, type Direction } from '../swipe';
+import { createFingerSwipe, type Direction } from '../swipe';
 import type { HudTimeLeft } from '../timeLeft';
 import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
@@ -60,10 +66,8 @@ const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
 const modeStore = createModeStore(localStorageOrNothing());
 const botChoiceStore = createBotChoiceStore(localStorageOrNothing());
-/** Space between the header timer or hunger bar and the header button on its right. */
-const HEADER_ITEM_GAP = 16;
 /**
- * The header hunger bar, in the timer's place beside the header button: endless rounds, which starve, have no timer.
+ * The header hunger bar, in the timer's place beside the header buttons: endless rounds, which starve, have no timer.
  * Its `label` sits left of the bar.
  */
 const HUNGER_BAR = { width: 120, height: 14, labelGap: 8, fillColour: 0xff4444, emptyColour: 0x333333 } as const;
@@ -80,6 +84,8 @@ export class GameScene extends Phaser.Scene {
   private fpsMeter = createFpsMeter();
   public scoreboard?: ScoreboardPanel;
   private headerButton?: PixelButton;
+  /** Toggles the scoreboard for players without a TAB key; lives as long as the scene. */
+  private scoreboardButton?: PixelButton;
   public scoreboardVisible: boolean = false;
   public isGameOver: boolean = false;
   public gameStarted: boolean = false;
@@ -652,6 +658,14 @@ export class GameScene extends Phaser.Scene {
       event.preventDefault();
       this.setScoreboardVisible(false);
     });
+    this.scoreboardButton?.destroy();
+    this.scoreboardButton = new PixelButton(this, {
+      ...scoreboardButtonPosition(this.scale.width),
+      width: SCOREBOARD_BUTTON.width,
+      height: HEADER_BUTTON.height,
+      label: SCOREBOARD_BUTTON.label,
+      onClick: () => this.setScoreboardVisible(!this.scoreboardVisible),
+    });
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
 
@@ -703,32 +717,25 @@ export class GameScene extends Phaser.Scene {
    * positions are converted back to CSS px before the Swipe sees them.
    */
   private listenForSwipes(): void {
-    const swipe = createSwipe();
-    let fingerId: number | null = null;
+    const swipe = createFingerSwipe();
     const toCssPx = (pointer: Phaser.Input.Pointer) => ({
       x: pointer.x / this.scale.displayScale.x,
       y: pointer.y / this.scale.displayScale.y,
     });
 
-    const onDown = (pointer: Phaser.Input.Pointer) => {
-      if (fingerId !== null) return;
-      fingerId = pointer.id;
+    // `over` is every interactive object under the press, so the header's Scores toggle (or any button) is a tap, never a swipe.
+    const onDown = (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       const { x, y } = toCssPx(pointer);
-      swipe.down(x, y);
+      swipe.down(pointer.id, x, y, over.length > 0);
     };
     const onMove = (pointer: Phaser.Input.Pointer) => {
-      if (pointer.id !== fingerId) return;
       const { x, y } = toCssPx(pointer);
       // Outside play the finger's travel is discarded, so the first turn after GO! starts from where it is then.
-      if (this.lastPhase !== 'playing' || !this.gameStarted || this.isGameOver) return swipe.down(x, y);
-      const turn = swipe.move(x, y);
+      if (this.lastPhase !== 'playing' || !this.gameStarted || this.isGameOver) return swipe.rebase(pointer.id, x, y);
+      const turn = swipe.move(pointer.id, x, y);
       if (turn) this.sendPlayerMovement(turn);
     };
-    const onUp = (pointer: Phaser.Input.Pointer) => {
-      if (pointer.id !== fingerId) return;
-      fingerId = null;
-      swipe.up();
-    };
+    const onUp = (pointer: Phaser.Input.Pointer) => swipe.up(pointer.id);
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, onDown);
     this.input.on(Phaser.Input.Events.POINTER_MOVE, onMove);
@@ -1146,15 +1153,14 @@ export class GameScene extends Phaser.Scene {
     this.scoreboard = undefined;
   }
 
-  /** Called on every room state patch: the header's time left in a timed round, right-aligned beside the header button. Null hides it. */
+  /** Called on every room state patch: the header's time left in a timed round, right-aligned beside the header buttons. Null hides it. */
   setTimeLeft(timeLeft: HudTimeLeft | null) {
     if (timeLeft === null) {
       this.destroyTimeLeftText();
       return;
     }
     if (!this.timeLeftText) {
-      const { x } = headerButtonPosition(this.scale.width);
-      this.timeLeftText = this.add.text(x - HEADER_ITEM_GAP, HEADER.height / 2, '', {
+      this.timeLeftText = this.add.text(headerItemsRight(this.scale.width), HEADER.height / 2, '', {
         fontFamily: FONT_FAMILY, fontSize: '28px', stroke: '#000000', strokeThickness: 4,
       }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10);
     }
@@ -1172,7 +1178,7 @@ export class GameScene extends Phaser.Scene {
       this.destroyHungerBar();
       return;
     }
-    const right = headerButtonPosition(this.scale.width).x - HEADER_ITEM_GAP;
+    const right = headerItemsRight(this.scale.width);
     const left = right - HUNGER_BAR.width;
     const top = (HEADER.height - HUNGER_BAR.height) / 2;
     if (!this.hungerBar) {
@@ -1335,6 +1341,8 @@ export class GameScene extends Phaser.Scene {
     this.destroyHungerBar();
     this.headerButton?.destroy();
     this.headerButton = undefined;
+    this.scoreboardButton?.destroy();
+    this.scoreboardButton = undefined;
     this.destroyLobbyPanel();
     this.destroyColourPanel();
     this.destroyLobbyAmbience();
