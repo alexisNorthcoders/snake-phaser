@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUTTON_FILLS, computeBevelRects, headerButtonPosition } from '../src/utils/pixelButtonStyle.ts';
+import {
+  BUTTON_FILLS,
+  HEADER_BUTTON,
+  HEADER_ITEM_GAP,
+  SCOREBOARD_BUTTON,
+  computeBevelRects,
+  headerButtonPosition,
+  headerItemsRight,
+  scoreboardButtonPosition,
+} from '../src/utils/pixelButtonStyle.ts';
 
 test('fill tokens', () => {
   assert.deepEqual(BUTTON_FILLS.button, { fill: 0x222222, hover: 0x444444 });
@@ -36,4 +45,20 @@ test('pressed swaps edges and drops the shadow', () => {
 
 test('header button is right-aligned 20px from the edge and centred in the strip', () => {
   assert.deepEqual(headerButtonPosition(800), { x: 690, y: 5 });
+});
+
+test('scoreboard button sits left of the header button, centred in the strip, without touching it', () => {
+  const header = headerButtonPosition(800);
+  const scores = scoreboardButtonPosition(800);
+  assert.equal(scores.y, header.y);
+  assert.equal(scores.x + SCOREBOARD_BUTTON.width + HEADER_BUTTON.gap, header.x);
+  assert.deepEqual(scores, { x: 602, y: 5 });
+});
+
+test('the timer and hunger bar end left of the scoreboard button, clear of the ping readout', () => {
+  const right = headerItemsRight(800);
+  assert.equal(right, scoreboardButtonPosition(800).x - HEADER_ITEM_GAP);
+  // Ping readout starts at 200; "Ping: 999ms" plus its signal bars ends before 360.
+  // The widest left item is the hunger bar (120) with its "Starving" label (~90) and 8px gap.
+  assert.ok(right - 120 - 8 - 90 > 360, `right edge ${right} leaves no room beside the ping readout`);
 });
