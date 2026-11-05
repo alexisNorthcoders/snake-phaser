@@ -31,6 +31,7 @@ import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
+import { createSwipe, type Direction } from '../swipe';
 import type { HudTimeLeft } from '../timeLeft';
 import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
 
@@ -152,7 +153,7 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  private sendPlayerMovement(direction: 'u' | 'd' | 'l' | 'r'): void {
+  private sendPlayerMovement(direction: Direction): void {
     socketManager.send({
       event: 'move',
       key: direction
@@ -657,7 +658,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.gameStarted || this.isGameOver) return;
 
       const key = event.key.toLowerCase();
-      let direction: 'u' | 'd' | 'l' | 'r' | null = null;
+      let direction: Direction | null = null;
 
       switch (key) {
         case 'arrowup':
@@ -684,6 +685,8 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
+    this.listenForSwipes();
+
     // First frame is the background and ambient snakes; everything that needs the player waits for the session.
     if (feature.lobbyAmbience) this.lobbyAmbience = new LobbyAmbience(this, () => this.snakeColors);
 
@@ -691,6 +694,52 @@ export class GameScene extends Phaser.Scene {
     ClientIdManager.getOrCreateClientId();
 
     this.bootSession();
+  }
+
+  /**
+   * Swipe steering. Gestures are tracked everywhere so a finger already down at GO! can steer,
+   * but turns are only sent while the phase is playing (unlike the keyboard, not during the
+   * countdown). Lobby and game-over taps never reach the server. The canvas is FIT-scaled, so pointer
+   * positions are converted back to CSS px before the Swipe sees them.
+   */
+  private listenForSwipes(): void {
+    const swipe = createSwipe();
+    let fingerId: number | null = null;
+    const toCssPx = (pointer: Phaser.Input.Pointer) => ({
+      x: pointer.x / this.scale.displayScale.x,
+      y: pointer.y / this.scale.displayScale.y,
+    });
+
+    const onDown = (pointer: Phaser.Input.Pointer) => {
+      if (fingerId !== null) return;
+      fingerId = pointer.id;
+      const { x, y } = toCssPx(pointer);
+      swipe.down(x, y);
+    };
+    const onMove = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.id !== fingerId) return;
+      const { x, y } = toCssPx(pointer);
+      // Outside play the finger's travel is discarded, so the first turn after GO! starts from where it is then.
+      if (this.lastPhase !== 'playing' || !this.gameStarted || this.isGameOver) return swipe.down(x, y);
+      const turn = swipe.move(x, y);
+      if (turn) this.sendPlayerMovement(turn);
+    };
+    const onUp = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.id !== fingerId) return;
+      fingerId = null;
+      swipe.up();
+    };
+
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, onDown);
+    this.input.on(Phaser.Input.Events.POINTER_MOVE, onMove);
+    this.input.on(Phaser.Input.Events.POINTER_UP, onUp);
+    this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, onUp);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off(Phaser.Input.Events.POINTER_DOWN, onDown);
+      this.input.off(Phaser.Input.Events.POINTER_MOVE, onMove);
+      this.input.off(Phaser.Input.Events.POINTER_UP, onUp);
+      this.input.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, onUp);
+    });
   }
 
   private sessionDeps(): SessionDeps {
