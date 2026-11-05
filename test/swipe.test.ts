@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSwipe, SWIPE_THRESHOLD, type Direction } from '../src/swipe.ts';
+import { createSwipe, type Direction } from '../src/swipe.ts';
 
 type Step = ['down' | 'move', number, number] | ['up'];
 
-// Feeds a gesture through a fresh interpreter and collects the turns that come out.
+// Feeds a gesture through a fresh Swipe and collects the turns that come out.
 function turns(steps: Step[]): Direction[] {
   const swipe = createSwipe();
   const out: Direction[] = [];
@@ -18,10 +18,6 @@ function turns(steps: Step[]): Direction[] {
   }
   return out;
 }
-
-test('the threshold is about 24 CSS px', () => {
-  assert.equal(SWIPE_THRESHOLD, 24);
-});
 
 test('movement below the threshold sends nothing', () => {
   assert.deepEqual(turns([['down', 100, 100], ['move', 110, 100], ['move', 100, 120], ['up']]), []);

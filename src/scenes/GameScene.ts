@@ -658,7 +658,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.gameStarted || this.isGameOver) return;
 
       const key = event.key.toLowerCase();
-      let direction: 'u' | 'd' | 'l' | 'r' | null = null;
+      let direction: Direction | null = null;
 
       switch (key) {
         case 'arrowup':
@@ -700,12 +700,12 @@ export class GameScene extends Phaser.Scene {
    * Swipe steering. Gestures are tracked everywhere so a finger already down at GO! can steer,
    * but turns are only sent while the phase is playing (unlike the keyboard, not during the
    * countdown). Lobby and game-over taps never reach the server. The canvas is FIT-scaled, so pointer
-   * positions are converted back to CSS px before the interpreter sees them.
+   * positions are converted back to CSS px before the Swipe sees them.
    */
   private listenForSwipes(): void {
     const swipe = createSwipe();
     let fingerId: number | null = null;
-    const css = (pointer: Phaser.Input.Pointer) => ({
+    const toCssPx = (pointer: Phaser.Input.Pointer) => ({
       x: pointer.x / this.scale.displayScale.x,
       y: pointer.y / this.scale.displayScale.y,
     });
@@ -713,14 +713,16 @@ export class GameScene extends Phaser.Scene {
     const onDown = (pointer: Phaser.Input.Pointer) => {
       if (fingerId !== null) return;
       fingerId = pointer.id;
-      const { x, y } = css(pointer);
+      const { x, y } = toCssPx(pointer);
       swipe.down(x, y);
     };
     const onMove = (pointer: Phaser.Input.Pointer) => {
       if (pointer.id !== fingerId) return;
-      const { x, y } = css(pointer);
+      const { x, y } = toCssPx(pointer);
+      // Outside play the finger's travel is discarded, so the first turn after GO! starts from where it is then.
+      if (this.lastPhase !== 'playing' || !this.gameStarted || this.isGameOver) return swipe.down(x, y);
       const turn = swipe.move(x, y);
-      if (turn && this.lastPhase === 'playing' && this.gameStarted && !this.isGameOver) this.sendPlayerMovement(turn);
+      if (turn) this.sendPlayerMovement(turn);
     };
     const onUp = (pointer: Phaser.Input.Pointer) => {
       if (pointer.id !== fingerId) return;
