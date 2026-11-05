@@ -37,6 +37,7 @@ import { FramedPanel } from '../FramedPanel';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { ScoreboardPanel } from '../ScoreboardPanel';
 import { countdownLabel, type Phase } from '../countdownOverlay';
+import { createSwipeHint } from '../swipeHint';
 import { createFingerSwipe, type Direction } from '../swipe';
 import type { HudTimeLeft } from '../timeLeft';
 import { LOBBY_PANEL, MODE_ROW, NAME_ROW_HEIGHT, START_BUTTON, TITLE_HEIGHT, computeLobbyPanelLayout } from '../utils/lobbyPanelLayout';
@@ -66,6 +67,7 @@ const appearanceStore = createAppearanceStore(localStorageOrNothing());
 const nameStore = createNameStore(localStorageOrNothing());
 const modeStore = createModeStore(localStorageOrNothing());
 const botChoiceStore = createBotChoiceStore(localStorageOrNothing());
+const swipeHint = createSwipeHint(localStorageOrNothing(), () => window.matchMedia?.('(pointer: coarse)').matches ?? false);
 /**
  * The header hunger bar, in the timer's place beside the header buttons: endless rounds, which starve, have no timer.
  * Its `label` sits left of the bar.
@@ -150,6 +152,8 @@ export class GameScene extends Phaser.Scene {
   private nameFieldFrame?: Phaser.GameObjects.Graphics;
   private gameOverObjects: { setVisible(visible: boolean): unknown; destroy(): void }[] = [];
   private countdownText?: Phaser.GameObjects.Text;
+  /** "Swipe to steer" under the countdown, on a phone player's first countdown only. */
+  private swipeHintText?: Phaser.GameObjects.Text;
   private goTimer?: Phaser.Time.TimerEvent;
   private lastPhase?: Phase;
   private reconnectText: Phaser.GameObjects.Text | null = null;
@@ -944,9 +948,15 @@ export class GameScene extends Phaser.Scene {
     this.goTimer = undefined;
     if (!this.countdownText) {
       const arenaTop = HEADER_BOTTOM;
-      this.countdownText = this.add.text(this.scale.width / 2, arenaTop + (this.scale.height - arenaTop) / 2, '', {
+      const centreY = arenaTop + (this.scale.height - arenaTop) / 2;
+      this.countdownText = this.add.text(this.scale.width / 2, centreY, '', {
         fontFamily: FONT_FAMILY, fontSize: '160px', color: '#ffffff', stroke: '#000000', strokeThickness: 10,
       }).setOrigin(0.5).setDepth(20);
+      if (phase === 'countdown' && swipeHint.take()) {
+        this.swipeHintText = this.add.text(this.scale.width / 2, centreY + 130, 'Swipe to steer', {
+          fontFamily: FONT_FAMILY, fontSize: '48px', color: '#ffffff', stroke: '#000000', strokeThickness: 6,
+        }).setOrigin(0.5).setDepth(20);
+      }
     }
     this.countdownText.setText(label);
     if (label === 'GO!') this.goTimer = this.time.delayedCall(700, () => this.clearCountdownOverlay());
@@ -963,6 +973,8 @@ export class GameScene extends Phaser.Scene {
     this.goTimer = undefined;
     this.countdownText?.destroy();
     this.countdownText = undefined;
+    this.swipeHintText?.destroy();
+    this.swipeHintText = undefined;
   }
 
   onGameStarted() {
@@ -1310,6 +1322,7 @@ export class GameScene extends Phaser.Scene {
     this.gameOverObjects = [];
     this.scoreboardVisible = false;
     this.countdownText = undefined;
+    this.swipeHintText = undefined;
     this.goTimer = undefined;
     this.lastPhase = undefined;
   }
