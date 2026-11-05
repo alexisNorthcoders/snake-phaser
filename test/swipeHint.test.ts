@@ -45,3 +45,9 @@ test('storage that throws never breaks the hint', () => {
 test('works without storage', () => {
   assert.equal(createSwipeHint(undefined, coarse).take(), true);
 });
+
+test('with storage blocked, the hint shows once per page load', () => {
+  const hint = createSwipeHint(throwingStorage, coarse);
+  assert.equal(hint.take(), true);
+  assert.equal(hint.take(), false);
+});
