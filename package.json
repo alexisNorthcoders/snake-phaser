@@ -10,10 +10,12 @@
     "test": "node --test 'test/**/*.test.ts'",
     "assets:generate": "node tools/assets/generate.ts",
     "assets:promote": "node tools/assets/promote.ts",
+    "share-card": "node tools/share-card/generate.ts",
     "typecheck:tools": "tsc -p tools/assets/tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^24.13.6",
+    "puppeteer-core": "^25.16.0",
     "sharp": "^0.35.4",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
