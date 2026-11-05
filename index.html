@@ -9,6 +9,11 @@
 
 <body>
   <style>
+    html,
+    body {
+      overscroll-behavior: none;
+    }
+
     body {
       background-color: %THEME_BACKGROUND%;
       margin: 0;
@@ -17,11 +22,26 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      height: 100dvh;
     }
 
+    /* Phaser FITs the square board inside this box. In portrait the box is only as tall as
+       it is wide, so the board sits at the top and the address bar showing/hiding can't move it. */
     #game-container {
       background-color: %THEME_BACKGROUND%;
+      width: 100%;
+      height: min(100dvh, 100vw);
+      touch-action: none;
+    }
+
+    #game-container canvas {
+      display: block;
+    }
+
+    @media (orientation: portrait) {
+      body {
+        align-items: flex-start;
+      }
     }
   </style>
   <div id="game-container"></div>
