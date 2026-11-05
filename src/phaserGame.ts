@@ -16,20 +16,12 @@ function applyDefaultFont() {
 export async function launchGame() {
   applyDefaultFont();
 
-  const MAX_WIDTH = 800;
-  const MAX_HEIGHT = 840;
-
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-console.log(isMobile)
-  const width = isMobile ? Math.min(window.innerWidth, MAX_WIDTH) : MAX_WIDTH;
-  const height = isMobile ? Math.min(window.innerHeight, MAX_HEIGHT) : MAX_HEIGHT;
-  console.log(width)
+  // Logical size is fixed; FIT scales the canvas down to the container, never up past this.
+  const SIZE = 800;
 
   const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
     pixelArt: true,
-    width,
-    height: width,
     parent: 'game-container',
     dom: {
       createContainer: true
@@ -44,10 +36,11 @@ console.log(isMobile)
       }]
     },
     scale: {
-     // mode: isMobile ? Phaser.Scale.FIT : Phaser.Scale.NONE,
+      mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: width,
-      height: width
+      width: SIZE,
+      height: SIZE,
+      max: { width: SIZE, height: SIZE }
     }
   };
 
