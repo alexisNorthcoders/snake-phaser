@@ -58,6 +58,7 @@ test('scoreboard button sits left of the header button, centred in the strip, wi
 test('the timer and hunger bar end left of the scoreboard button, clear of the ping readout', () => {
   const right = headerItemsRight(800);
   assert.equal(right, scoreboardButtonPosition(800).x - HEADER_ITEM_GAP);
+  // The canvas is a fixed 800 logical px FIT-scaled to the screen, so a 360 px phone sees this same layout.
   // Ping readout starts at 200; "Ping: 999ms" plus its signal bars ends before 360.
   // The widest left item is the hunger bar (120) with its "Starving" label (~90) and 8px gap.
   assert.ok(right - 120 - 8 - 90 > 360, `right edge ${right} leaves no room beside the ping readout`);
